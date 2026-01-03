@@ -67,6 +67,41 @@ export const findDeputyByName = async (name: string): Promise<Deputy | null> => 
 };
 
 /**
+ * Busca a URL da foto oficial do deputado pelo nome.
+ * Retorna a URL da foto oficial do site da Câmara.
+ */
+export const getDeputyPhotoUrl = async (name: string): Promise<string | null> => {
+  try {
+    const deputy = await findDeputyByName(name);
+    if (deputy && deputy.urlFoto) {
+      return deputy.urlFoto;
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao buscar foto do deputado:", error);
+    return null;
+  }
+};
+
+/**
+ * Busca todos os deputados de um estado específico.
+ */
+export const getDeputiesByState = async (uf: string = 'PE'): Promise<Deputy[]> => {
+  try {
+    const url = `${BASE_URL}/deputados?siglaUf=${uf}&ordem=ASC&ordenarPor=nome&itens=100`;
+    const response = await fetch(url);
+    
+    if (!response.ok) throw new Error('Falha ao buscar deputados');
+    
+    const data = await response.json();
+    return data.dados || [];
+  } catch (error) {
+    console.error("Erro ao buscar deputados por estado:", error);
+    return [];
+  }
+};
+
+/**
  * Busca estatísticas de gabinete e assessores.
  * NOTA: A API V2 da Câmara não fornece um endpoint direto e simples para "contagem de assessores" 
  * que não envolva baixar arquivos grandes ou scraping.
