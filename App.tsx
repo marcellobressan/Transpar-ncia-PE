@@ -355,6 +355,7 @@ const App: React.FC = () => {
                                   className="w-16 h-16 rounded-xl object-contain bg-white shadow-elevated border border-slate-100 p-1.5 group-hover:scale-105 group-hover:shadow-elevated-lg transition-all duration-300 ease-out-expo" 
                                   alt={`Logo do partido ${c.party}`}
                                   loading="lazy"
+                                  onError={(e) => { e.currentTarget.src = PARTY_LOGOS['DEFAULT']; }}
                                 />
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.party}</span>
                               </div>

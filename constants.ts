@@ -1,12 +1,34 @@
 import { Politician, Sphere, EfficiencyRating, CandidacyStatus } from './types';
 
+// URLs de logos de partidos - usando CDNs e fontes confiáveis
 export const PARTY_LOGOS: Record<string, string> = {
-  'PT': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Partido_dos_Trabalhadores_Emblema.svg/1024px-Partido_dos_Trabalhadores_Emblema.svg.png',
-  'PL': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Logo_do_Partido_Liberal_%282006%29.svg/2048px-Logo_do_Partido_Liberal_%282006%29.svg.png',
-  'PSB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Logo_PSB.png/800px-Logo_PSB.png',
-  'PSDB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/PSDB_logo.svg/2560px-PSDB_logo.svg.png',
-  'REDE': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Rede_Sustentabilidade_logo.svg/1200px-Rede_Sustentabilidade_logo.svg.png',
-  'DEFAULT': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Political_party.svg/1200px-Political_party.svg.png'
+  // Partidos principais com logos em formato mais estável
+  'PT': 'https://logodownload.org/wp-content/uploads/2017/04/pt-logo-partido-dos-trabalhadores.png',
+  'PL': 'https://logodownload.org/wp-content/uploads/2022/03/pl-partido-liberal-logo.png',
+  'PSB': 'https://logodownload.org/wp-content/uploads/2017/04/psb-logo.png',
+  'PSDB': 'https://logodownload.org/wp-content/uploads/2017/04/psdb-logo-1.png',
+  'REDE': 'https://logodownload.org/wp-content/uploads/2019/08/rede-sustentabilidade-logo.png',
+  'MDB': 'https://logodownload.org/wp-content/uploads/2017/04/mdb-logo.png',
+  'PP': 'https://logodownload.org/wp-content/uploads/2022/03/pp-progressistas-logo.png',
+  'UNIÃO': 'https://logodownload.org/wp-content/uploads/2022/03/uniao-brasil-logo.png',
+  'UNIÃO BRASIL': 'https://logodownload.org/wp-content/uploads/2022/03/uniao-brasil-logo.png',
+  'REPUBLICANOS': 'https://logodownload.org/wp-content/uploads/2022/03/republicanos-logo.png',
+  'PSD': 'https://logodownload.org/wp-content/uploads/2017/04/psd-logo-1.png',
+  'PDT': 'https://logodownload.org/wp-content/uploads/2017/04/pdt-logo-1.png',
+  'SOLIDARIEDADE': 'https://logodownload.org/wp-content/uploads/2022/03/solidariedade-logo.png',
+  'PODE': 'https://logodownload.org/wp-content/uploads/2022/03/podemos-logo.png',
+  'PODEMOS': 'https://logodownload.org/wp-content/uploads/2022/03/podemos-logo.png',
+  'CIDADANIA': 'https://logodownload.org/wp-content/uploads/2022/03/cidadania-23-logo.png',
+  'PSOL': 'https://logodownload.org/wp-content/uploads/2022/03/psol-50-logo.png',
+  'PCdoB': 'https://logodownload.org/wp-content/uploads/2017/04/pcdob-logo.png',
+  'PCDOB': 'https://logodownload.org/wp-content/uploads/2017/04/pcdob-logo.png',
+  'NOVO': 'https://logodownload.org/wp-content/uploads/2022/03/novo-30-logo.png',
+  'AVANTE': 'https://logodownload.org/wp-content/uploads/2022/03/avante-logo.png',
+  'PV': 'https://logodownload.org/wp-content/uploads/2017/04/pv-logo.png',
+  'PROS': 'https://logodownload.org/wp-content/uploads/2022/03/pros-logo.png',
+  'PTB': 'https://logodownload.org/wp-content/uploads/2017/04/ptb-logo.png',
+  // Fallback genérico
+  'DEFAULT': 'https://cdn-icons-png.flaticon.com/512/3135/3135679.png'
 };
 
 export const MOCK_POLITICIANS: Politician[] = [

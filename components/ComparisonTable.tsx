@@ -122,6 +122,7 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({ politicians }) => {
                       src={PARTY_LOGOS[pol.party] || PARTY_LOGOS['DEFAULT']} 
                       alt="" 
                       aria-hidden="true"
+                      onError={(e) => { e.currentTarget.src = PARTY_LOGOS['DEFAULT']; }}
                     />
                   </div>
                   <div>

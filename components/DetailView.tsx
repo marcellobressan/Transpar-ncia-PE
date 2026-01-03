@@ -496,6 +496,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                   src={PARTY_LOGOS[politician.party] || PARTY_LOGOS['DEFAULT']} 
                   alt={`Logo do partido ${politician.party}`}
                   className="w-8 h-8 object-contain"
+                  onError={(e) => { e.currentTarget.src = PARTY_LOGOS['DEFAULT']; }}
                 />
               </div>
             </div>
