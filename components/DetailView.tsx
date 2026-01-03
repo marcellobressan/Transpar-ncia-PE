@@ -693,7 +693,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
 
         </div>
       </div>
-    </div>
+    </article>
   );
 };
 
