@@ -100,25 +100,166 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const AVAILABLE_YEARS = [2024, 2023, 2022, 2021, 2020];
 
   // Helper para identificar o tipo de político
-  const getPoliticianType = (): 'deputado' | 'senador' | 'executivo' | 'outro' => {
+  const getPoliticianType = (): 'deputado_federal' | 'senador' | 'governador' | 'prefeito' | 'deputado_estadual' | 'vereador' | 'outro' => {
     const role = (politician.currentRole ?? politician.position ?? '').toLowerCase();
-    if (role.includes('deputad')) return 'deputado';
+    if (role.includes('deputado federal') || (role.includes('deputad') && politician.sphere === 'Federal')) return 'deputado_federal';
+    if (role.includes('deputado estadual') || (role.includes('deputad') && politician.sphere === 'Estadual')) return 'deputado_estadual';
     if (role.includes('senador')) return 'senador';
-    if (role.includes('governador') || role.includes('prefeito') || role.includes('ministro') || role.includes('secretário')) return 'executivo';
+    if (role.includes('governador')) return 'governador';
+    if (role.includes('prefeito')) return 'prefeito';
+    if (role.includes('vereador')) return 'vereador';
     return 'outro';
   };
 
   const politicianType = getPoliticianType();
-  const isLegislativo = politicianType === 'deputado' || politicianType === 'senador';
+  
+  // Configuração dinâmica baseada no tipo de político
+  const getTypeConfig = () => {
+    switch (politicianType) {
+      case 'deputado_federal':
+        return {
+          isLegislativo: true,
+          remuneracaoTitulo: 'Subsídio Parlamentar',
+          remuneracaoDescricao: 'Subsídio mensal fixo definido por decreto legislativo. Deputados federais recebem R$ 44.008,52/mês (2024).',
+          fonteDados: 'Câmara dos Deputados',
+          apiDisponivel: true,
+          temCEAP: true,
+          ceapTitulo: 'Cota Parlamentar (CEAP)',
+          ceapDescricao: 'Cota para Exercício da Atividade Parlamentar - despesas de gabinete, passagens, combustível, etc.',
+          temEmendas: true,
+          emendasTitulo: 'Emendas Parlamentares',
+          emendasDescricao: 'Emendas individuais, de bancada e de relator destinadas a Pernambuco.',
+          temGabinete: true,
+          gabineteTitulo: 'Verba de Gabinete',
+          gabineteDescricao: 'Limite de 25 secretários parlamentares com verba mensal de até R$ 118.376,13.',
+          portalUrl: 'https://www.camara.leg.br/deputados',
+          subsidioFixo: 44008.52,
+        };
+      case 'senador':
+        return {
+          isLegislativo: true,
+          remuneracaoTitulo: 'Subsídio Parlamentar',
+          remuneracaoDescricao: 'Subsídio mensal fixo definido por decreto legislativo. Senadores recebem R$ 44.008,52/mês (2024).',
+          fonteDados: 'Senado Federal',
+          apiDisponivel: true,
+          temCEAP: true,
+          ceapTitulo: 'CEAPS - Cota do Senado',
+          ceapDescricao: 'Cota para Exercício da Atividade Parlamentar dos Senadores.',
+          temEmendas: true,
+          emendasTitulo: 'Emendas Parlamentares',
+          emendasDescricao: 'Emendas individuais e de bancada destinadas a Pernambuco.',
+          temGabinete: true,
+          gabineteTitulo: 'Verba de Gabinete',
+          gabineteDescricao: 'Estrutura de gabinete do senador.',
+          portalUrl: 'https://www12.senado.leg.br/transparencia',
+          subsidioFixo: 44008.52,
+        };
+      case 'governador':
+        return {
+          isLegislativo: false,
+          remuneracaoTitulo: 'Remuneração do Governador',
+          remuneracaoDescricao: 'Subsídio definido pela Assembleia Legislativa de PE. Consulte o Portal de Transparência do Estado.',
+          fonteDados: 'Portal da Transparência de PE',
+          apiDisponivel: false,
+          temCEAP: false,
+          ceapTitulo: 'Despesas de Gabinete',
+          ceapDescricao: 'Despesas do Gabinete do Governador.',
+          temEmendas: false,
+          emendasTitulo: 'Emendas Recebidas',
+          emendasDescricao: 'Emendas parlamentares federais recebidas pelo estado.',
+          temGabinete: false,
+          gabineteTitulo: 'Estrutura de Governo',
+          gabineteDescricao: 'Secretarias e órgãos do governo estadual.',
+          portalUrl: 'https://transparencia.pe.gov.br',
+          subsidioFixo: null,
+        };
+      case 'prefeito':
+        return {
+          isLegislativo: false,
+          remuneracaoTitulo: 'Remuneração do Prefeito',
+          remuneracaoDescricao: 'Subsídio definido pela Câmara Municipal. Consulte o Portal de Transparência do município.',
+          fonteDados: politician.location?.includes('Recife') ? 'Portal da Transparência de Recife' : 'Portal da Transparência Municipal',
+          apiDisponivel: false,
+          temCEAP: false,
+          ceapTitulo: 'Despesas de Gabinete',
+          ceapDescricao: 'Despesas do Gabinete do Prefeito.',
+          temEmendas: false,
+          emendasTitulo: 'Transferências Recebidas',
+          emendasDescricao: 'Transferências federais e estaduais recebidas pelo município.',
+          temGabinete: false,
+          gabineteTitulo: 'Estrutura da Prefeitura',
+          gabineteDescricao: 'Secretarias municipais e órgãos da administração.',
+          portalUrl: politician.location?.includes('Recife') ? 'https://transparencia.recife.pe.gov.br' : 'https://transparencia.pe.gov.br',
+          subsidioFixo: null,
+        };
+      case 'deputado_estadual':
+        return {
+          isLegislativo: true,
+          remuneracaoTitulo: 'Subsídio Parlamentar',
+          remuneracaoDescricao: 'Subsídio definido pela Assembleia Legislativa de PE (75% do subsídio de deputado federal).',
+          fonteDados: 'Assembleia Legislativa de PE',
+          apiDisponivel: false,
+          temCEAP: true,
+          ceapTitulo: 'Verba Indenizatória',
+          ceapDescricao: 'Verba para exercício da atividade parlamentar estadual.',
+          temEmendas: true,
+          emendasTitulo: 'Emendas Estaduais',
+          emendasDescricao: 'Emendas ao orçamento estadual.',
+          temGabinete: true,
+          gabineteTitulo: 'Verba de Gabinete',
+          gabineteDescricao: 'Estrutura de gabinete do deputado estadual.',
+          portalUrl: 'https://www.alepe.pe.gov.br/transparencia',
+          subsidioFixo: 33006.39, // 75% do federal
+        };
+      case 'vereador':
+        return {
+          isLegislativo: true,
+          remuneracaoTitulo: 'Subsídio de Vereador',
+          remuneracaoDescricao: 'Subsídio definido pela própria Câmara Municipal, limitado a percentual do subsídio de deputado estadual.',
+          fonteDados: 'Câmara Municipal',
+          apiDisponivel: false,
+          temCEAP: false,
+          ceapTitulo: 'Verba de Gabinete',
+          ceapDescricao: 'Verba para exercício do mandato.',
+          temEmendas: false,
+          emendasTitulo: 'Emendas Municipais',
+          emendasDescricao: 'Emendas impositivas ao orçamento municipal.',
+          temGabinete: true,
+          gabineteTitulo: 'Estrutura de Gabinete',
+          gabineteDescricao: 'Assessores e estrutura do gabinete.',
+          portalUrl: 'https://transparencia.recife.pe.gov.br',
+          subsidioFixo: null,
+        };
+      default:
+        return {
+          isLegislativo: false,
+          remuneracaoTitulo: 'Remuneração',
+          remuneracaoDescricao: 'Consulte o portal de transparência correspondente.',
+          fonteDados: 'Portal da Transparência',
+          apiDisponivel: false,
+          temCEAP: false,
+          ceapTitulo: 'Despesas',
+          ceapDescricao: 'Despesas relacionadas ao cargo.',
+          temEmendas: false,
+          emendasTitulo: 'Emendas/Transferências',
+          emendasDescricao: 'Recursos destinados.',
+          temGabinete: false,
+          gabineteTitulo: 'Estrutura',
+          gabineteDescricao: 'Estrutura administrativa.',
+          portalUrl: 'https://portaldatransparencia.gov.br',
+          subsidioFixo: null,
+        };
+    }
+  };
+
+  const typeConfig = getTypeConfig();
+  const isLegislativo = typeConfig.isLegislativo;
 
   // --- Handlers (mantendo a lógica original) ---
   const handleSyncSalary = async () => {
-    // Deputados e senadores não estão no Portal da Transparência (Executivo Federal)
-    if (isLegislativo) {
-      const sourceInfo = politicianType === 'deputado' 
-        ? 'Câmara dos Deputados (dados já carregados via API da Câmara)'
-        : 'Senado Federal (dados já carregados via API do Senado)';
-      setSalaryError(`${politicianType === 'deputado' ? 'Deputados' : 'Senadores'} não constam no Portal da Transparência (apenas servidores do Executivo Federal). Fonte de dados: ${sourceInfo}`);
+    // Políticos com API não disponível devem consultar portais específicos
+    if (!typeConfig.apiDisponivel || isLegislativo) {
+      setSalaryError(`Dados de ${typeConfig.remuneracaoTitulo.toLowerCase()} não disponíveis via Portal da Transparência Federal. Fonte recomendada: ${typeConfig.fonteDados}`);
       return;
     }
 
@@ -411,9 +552,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-brand-500" />
-                    Histórico de Remuneração
+                    {typeConfig.remuneracaoTitulo}
                   </h3>
-                  <p className="text-sm text-slate-500">Valores brutos recebidos mensal ou anualmente.</p>
+                  <p className="text-sm text-slate-500">{typeConfig.remuneracaoDescricao}</p>
                 </div>
                 
                 <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
@@ -422,17 +563,27 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                         className="bg-transparent text-xs font-semibold text-slate-700 py-1.5 pl-2 pr-6 rounded-lg focus:outline-none cursor-pointer"
                         value={salaryYear}
                         onChange={(e) => setSalaryYear(Number(e.target.value))}
-                        disabled={isSyncingSalary || isLegislativo}
+                        disabled={isSyncingSalary || !typeConfig.apiDisponivel}
                       >
                         {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                       <Calendar className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                    </div>
                    <div className="w-px h-6 bg-slate-200"></div>
-                   {isLegislativo ? (
+                   {!typeConfig.apiDisponivel ? (
+                     <a 
+                       href={typeConfig.portalUrl} 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-2 transition"
+                     >
+                       <ExternalLink className="w-3 h-3" />
+                       Consultar {typeConfig.fonteDados}
+                     </a>
+                   ) : isLegislativo ? (
                      <span className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-500 flex items-center gap-2">
                        <Info className="w-3 h-3" />
-                       {politicianType === 'deputado' ? 'Dados via Câmara' : 'Dados via Senado'}
+                       Dados via {typeConfig.fonteDados}
                      </span>
                    ) : (
                      <button 
@@ -451,20 +602,31 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                 </div>
               </div>
 
-              {/* Banner informativo para Legislativo */}
-              {isLegislativo && (
-                <div className="mb-6 bg-blue-50 border border-blue-100 text-blue-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
-                  <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
-                  <div>
-                    <p className="font-semibold">Fonte: {politicianType === 'deputado' ? 'Câmara dos Deputados' : 'Senado Federal'}</p>
-                    <p className="text-blue-600 mt-1">
-                      {politicianType === 'deputado' 
-                        ? 'Os subsídios de deputados federais são fixos e definidos por decreto legislativo. Os dados de despesas de gabinete (CEAP) são obtidos da API da Câmara.'
-                        : 'Os subsídios de senadores são fixos e definidos por decreto legislativo. Os dados de despesas são obtidos da API do Senado.'}
-                    </p>
-                  </div>
+              {/* Banner informativo baseado no tipo de político */}
+              <div className="mb-6 bg-blue-50 border border-blue-100 text-blue-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                <div>
+                  <p className="font-semibold">Fonte: {typeConfig.fonteDados}</p>
+                  <p className="text-blue-600 mt-1">
+                    {typeConfig.remuneracaoDescricao}
+                    {typeConfig.subsidioFixo && (
+                      <span className="block mt-1 font-medium">
+                        Subsídio atual: {FORMATTER_BRL.format(typeConfig.subsidioFixo)}/mês
+                      </span>
+                    )}
+                  </p>
+                  {!typeConfig.apiDisponivel && (
+                    <a 
+                      href={typeConfig.portalUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center gap-1 mt-2 text-brand-600 hover:text-brand-700 font-semibold"
+                    >
+                      Acessar portal oficial <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
-              )}
+              </div>
 
               {salaryError && (
                 <div className="mb-6 bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
@@ -533,18 +695,18 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
             </div>
           )}
 
-          {/* CEAP SECTION */}
+          {/* CEAP SECTION - Apenas para tipos com cota parlamentar */}
           {(activeFilter === 'TODOS' || activeFilter === 'CEAP') && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
                <div className="flex justify-between items-center mb-6">
                  <div>
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-brand-500" />
-                      Cota Parlamentar (CEAP)
+                      {typeConfig.ceapTitulo}
                     </h3>
-                    <p className="text-sm text-slate-500">Gastos operacionais do mandato.</p>
+                    <p className="text-sm text-slate-500">{typeConfig.ceapDescricao}</p>
                  </div>
-                 {politician.sphere === 'Federal' && (
+                 {typeConfig.temCEAP && politician.sphere === 'Federal' && (
                     <button 
                       onClick={handleSyncCamara}
                       disabled={isSyncingCamara}
@@ -556,7 +718,42 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                       {ceapDataOverride ? 'Atualizado' : 'Baixar Dados'}
                     </button>
                  )}
+                 {!typeConfig.temCEAP && (
+                   <a 
+                     href={typeConfig.portalUrl} 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-2 transition"
+                   >
+                     <ExternalLink className="w-3 h-3" />
+                     Ver no Portal
+                   </a>
+                 )}
                </div>
+
+               {/* Mensagem para políticos sem CEAP */}
+               {!typeConfig.temCEAP && (
+                 <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                   <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
+                   <div>
+                     <p className="font-semibold">Dados não disponíveis via API</p>
+                     <p className="text-amber-600 mt-1">
+                       {politicianType === 'governador' && 'Despesas do Governo de Pernambuco devem ser consultadas no Portal da Transparência Estadual.'}
+                       {politicianType === 'prefeito' && 'Despesas da Prefeitura devem ser consultadas no Portal da Transparência Municipal.'}
+                       {politicianType === 'vereador' && 'Despesas de vereadores devem ser consultadas no Portal da Câmara Municipal.'}
+                       {politicianType === 'outro' && 'Consulte o portal de transparência correspondente ao cargo.'}
+                     </p>
+                     <a 
+                       href={typeConfig.portalUrl} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="inline-flex items-center gap-1 mt-2 text-amber-700 hover:text-amber-900 font-semibold"
+                     >
+                       Acessar portal oficial <ExternalLink className="w-3 h-3" />
+                     </a>
+                   </div>
+                 </div>
+               )}
 
                {/* Fuel Warnings Card */}
                {fuelAnalysis && fuelAnalysis.warnings.length > 0 && (
@@ -606,17 +803,53 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                  <div>
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                       <Globe className="w-5 h-5 text-brand-500" />
-                      Emendas Parlamentares
+                      {typeConfig.emendasTitulo}
                     </h3>
-                    <p className="text-sm text-slate-500">Recursos destinados a obras e serviços.</p>
+                    <p className="text-sm text-slate-500">{typeConfig.emendasDescricao}</p>
                  </div>
-                 {politician.sphere === 'Federal' && (
+                 {typeConfig.temEmendas && politician.sphere === 'Federal' && (
                    <button onClick={handleFetchRealData} disabled={isLoadingRealData} className="text-xs px-3 py-1.5 bg-slate-800 text-white rounded-lg font-bold flex items-center gap-2">
                       {isLoadingRealData ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Globe className="w-3 h-3"/>}
                       Buscar Portal
                    </button>
                  )}
+                 {!typeConfig.temEmendas && (
+                   <a 
+                     href={typeConfig.portalUrl} 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-2 transition"
+                   >
+                     <ExternalLink className="w-3 h-3" />
+                     Ver no Portal
+                   </a>
+                 )}
                </div>
+
+               {/* Mensagem para políticos sem emendas parlamentares */}
+               {!typeConfig.temEmendas && (
+                 <div className="mb-6 bg-blue-50 border border-blue-100 text-blue-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                   <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                   <div>
+                     <p className="font-semibold">Informação sobre transferências</p>
+                     <p className="text-blue-600 mt-1">
+                       {politicianType === 'governador' && 'Emendas parlamentares federais recebidas pelo Estado de PE podem ser consultadas no Portal da Transparência.'}
+                       {politicianType === 'prefeito' && 'Transferências federais e estaduais recebidas pelo município podem ser consultadas no Portal da Transparência.'}
+                       {politicianType === 'vereador' && 'Vereadores podem propor emendas impositivas ao orçamento municipal. Consulte a Câmara Municipal.'}
+                       {politicianType === 'deputado_estadual' && 'Emendas ao orçamento estadual podem ser consultadas no portal da ALEPE.'}
+                       {politicianType === 'outro' && 'Consulte o portal de transparência correspondente.'}
+                     </p>
+                     <a 
+                       href={typeConfig.portalUrl} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="inline-flex items-center gap-1 mt-2 text-brand-600 hover:text-brand-700 font-semibold"
+                     >
+                       Acessar portal oficial <ExternalLink className="w-3 h-3" />
+                     </a>
+                   </div>
+                 </div>
+               )}
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                   <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 flex flex-col justify-center items-center text-center">
@@ -745,6 +978,32 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                <Link2 className="w-5 h-5 text-brand-500" />
                Consultar Fontes Oficiais
              </h3>
+             
+             {/* Banner da fonte principal baseada no tipo de político */}
+             <div className="mb-4 p-4 bg-white rounded-xl border border-slate-200">
+               <div className="flex items-center gap-3">
+                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                   isLegislativo ? 'bg-brand-100 text-brand-600' : 'bg-emerald-100 text-emerald-600'
+                 }`}>
+                   {isLegislativo ? <Building2 className="w-5 h-5" /> : <Globe className="w-5 h-5" />}
+                 </div>
+                 <div className="flex-1">
+                   <p className="text-sm font-bold text-slate-800">Fonte Principal: {typeConfig.fonteDados}</p>
+                   <p className="text-xs text-slate-500 mt-0.5">
+                     {typeConfig.apiDisponivel ? 'Dados obtidos via API oficial' : 'Consulta manual necessária'}
+                   </p>
+                 </div>
+                 <a 
+                   href={typeConfig.portalUrl} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition flex items-center gap-1"
+                 >
+                   Acessar <ExternalLink className="w-3 h-3" />
+                 </a>
+               </div>
+             </div>
+             
              <p className="text-sm text-slate-600 mb-4">
                Acesse diretamente os portais de transparência para dados completos:
              </p>
