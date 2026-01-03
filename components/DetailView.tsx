@@ -5,11 +5,12 @@ import EfficiencyBadge from './EfficiencyBadge';
 import Tooltip from './Tooltip';
 import CSVEmendasViewer from './CSVEmendasViewer';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
-import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code, Upload, Newspaper, BookOpen, Scale, X } from 'lucide-react';
 import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda, getUrlsAnalise, PORTAL_URLS, DOWNLOAD_URLS } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
 import { getLinksConsulta, getResumoFontes, LinkConsulta, PORTAIS_PE } from '../services/transparenciaPE';
+import { getNewsSearchUrls, getOfficialSearchUrls, buildAlertSearchQuery, NewsResult, searchNews } from '../services/newsSearch';
 
 interface DetailViewProps {
   candidate: Politician;
@@ -62,6 +63,15 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const [isLoadingFactCheck, setIsLoadingFactCheck] = useState(false);
   const [factCheckError, setFactCheckError] = useState<string | null>(null);
   const [factChecks, setFactChecks] = useState<FactCheckClaim[] | null>(null);
+  const [factCheckAutoRan, setFactCheckAutoRan] = useState(false);
+
+  // Estados para busca de notícias
+  const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
+  const [showNewsModal, setShowNewsModal] = useState(false);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState('');
+  const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
 
   const [activeFilter, setActiveFilter] = useState<SpendingFilter>('TODOS');
 
@@ -418,23 +428,85 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
     }
   };
 
-  const handleFetchFactCheck = async () => {
+  const handleFetchFactCheck = useCallback(async () => {
+    if (isLoadingFactCheck) return;
     setIsLoadingFactCheck(true);
     setFactCheckError(null);
     try {
       const results = await searchFactChecks(politician.name);
       if (results.length === 0) {
-        setFactCheckError("Nenhuma checagem de fatos encontrada.");
+        setFactCheckError("Nenhuma checagem de fatos encontrada para este nome.");
         setFactChecks([]);
       } else {
         setFactChecks(results);
+        setFactCheckError(null);
       }
     } catch (e: any) {
        setFactCheckError("Erro ao consultar serviço de Fact Check do Google.");
     } finally {
       setIsLoadingFactCheck(false);
+      setFactCheckAutoRan(true);
+    }
+  }, [politician.name, isLoadingFactCheck]);
+
+  // Executa fact check automaticamente ao carregar
+  useEffect(() => {
+    if (!factCheckAutoRan && politician.name) {
+      handleFetchFactCheck();
+    }
+  }, [politician.name, factCheckAutoRan, handleFetchFactCheck]);
+
+  // Handler para buscar notícias sobre um alerta específico
+  const handleSearchAlertNews = async (alertTitle: string, alertDescription: string) => {
+    const query = buildAlertSearchQuery(politician.name, alertTitle, alertDescription);
+    setCurrentSearchQuery(query);
+    setIsLoadingNews(true);
+    setNewsError(null);
+    setShowNewsModal(true);
+
+    try {
+      const response = await searchNews(query, { numResults: 8, dateRestrict: 'y2' });
+      if (response.error) {
+        setNewsError(response.error);
+        setNewsResults([]);
+      } else {
+        setNewsResults(response.results);
+      }
+    } catch (e) {
+      setNewsError('Erro ao buscar notícias. Use os links alternativos.');
+      setNewsResults([]);
+    } finally {
+      setIsLoadingNews(false);
     }
   };
+
+  // Handler para buscar notícias gerais sobre o político
+  const handleSearchPoliticianNews = async () => {
+    const query = `"${politician.name}" político Pernambuco`;
+    setCurrentSearchQuery(query);
+    setIsLoadingNews(true);
+    setNewsError(null);
+    setShowNewsModal(true);
+
+    try {
+      const response = await searchNews(query, { numResults: 10, dateRestrict: 'y1' });
+      if (response.error) {
+        setNewsError(response.error);
+        setNewsResults([]);
+      } else {
+        setNewsResults(response.results);
+      }
+    } catch (e) {
+      setNewsError('Erro ao buscar notícias. Use os links alternativos.');
+      setNewsResults([]);
+    } finally {
+      setIsLoadingNews(false);
+    }
+  };
+
+  // URLs de busca de notícias e portais oficiais
+  const newsSearchUrls = getNewsSearchUrls(politician.name);
+  const officialSearchUrls = getOfficialSearchUrls(politician.name);
 
   const FilterButton = ({ type, label, icon: Icon }: { type: SpendingFilter, label: string, icon?: React.ElementType }) => (
     <button
@@ -1459,16 +1531,25 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                                   <Database className="w-3 h-3" />
                                   Fonte: {flag.source}
                                 </span>
-                                {flag.sourceUrl && (
-                                  <a 
-                                    href={flag.sourceUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-bold text-brand-600 uppercase tracking-wide flex items-center gap-1 hover:text-brand-700 transition-colors"
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleSearchAlertNews(flag.title || 'Ponto de Atenção', flag.description)}
+                                    className="text-[10px] font-bold text-blue-600 uppercase tracking-wide flex items-center gap-1 hover:text-blue-700 transition-colors bg-blue-50 px-2 py-1 rounded-lg"
                                   >
-                                    Verificar <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                )}
+                                    <Newspaper className="w-3 h-3" />
+                                    Buscar Notícias
+                                  </button>
+                                  {flag.sourceUrl && (
+                                    <a 
+                                      href={flag.sourceUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] font-bold text-brand-600 uppercase tracking-wide flex items-center gap-1 hover:text-brand-700 transition-colors"
+                                    >
+                                      Verificar <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1502,6 +1583,54 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* News Search Section */}
+              <div className="mx-6 mb-4 p-4 bg-blue-50/80 backdrop-blur-sm rounded-2xl border border-blue-200">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-blue-100 rounded-lg">
+                      <Newspaper className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">Pesquisar Notícias</span>
+                  </div>
+                  <button 
+                    onClick={handleSearchPoliticianNews}
+                    disabled={isLoadingNews}
+                    className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  >
+                    {isLoadingNews ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3 h-3" />
+                        Buscar Notícias sobre {politician.name.split(' ')[0]}
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-600 mb-3">
+                  Pesquise notícias recentes e informações sobre este político em portais de notícias e fontes oficiais.
+                </p>
+                
+                {/* Quick Links */}
+                <div className="grid grid-cols-4 gap-2">
+                  {newsSearchUrls.slice(0, 4).map((portal, idx) => (
+                    <a
+                      key={idx}
+                      href={portal.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-medium transition-colors border border-blue-200"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5" />
+                      {portal.name}
+                    </a>
+                  ))}
+                </div>
               </div>
 
               {/* Fact Check Section */}
@@ -1747,6 +1876,139 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
               nomeAutorPadrao={politician.name}
               onClose={() => setShowCSVViewer(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Busca de Notícias */}
+      {showNewsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-3xl max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-brand-600 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl">
+                    <Newspaper className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Busca de Notícias</h3>
+                    <p className="text-sm text-white/80">Pesquisando: {currentSearchQuery}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowNewsModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {isLoadingNews ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 text-brand-600 animate-spin mb-4" />
+                  <p className="text-slate-600">Buscando notícias...</p>
+                </div>
+              ) : newsError ? (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center">
+                  <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
+                  <p className="text-rose-700 font-medium mb-2">Erro na busca</p>
+                  <p className="text-sm text-rose-600">{newsError}</p>
+                </div>
+              ) : newsResults.length > 0 ? (
+                <div className="space-y-4">
+                  {newsResults.map((news, idx) => (
+                    <a
+                      key={idx}
+                      href={news.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 hover:border-brand-300 transition-all"
+                    >
+                      <h4 className="font-bold text-slate-800 mb-2 line-clamp-2">{news.title}</h4>
+                      <p className="text-sm text-slate-600 line-clamp-3 mb-3">{news.snippet}</p>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="font-medium text-brand-600">{news.source}</span>
+                        {news.date && (
+                          <>
+                            <span>•</span>
+                            <span>{news.date}</span>
+                          </>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 mb-2">Nenhum resultado encontrado na API</p>
+                  <p className="text-sm text-slate-400">Use os links abaixo para pesquisar em outros portais</p>
+                </div>
+              )}
+
+              {/* Quick Links Section */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Pesquisar em Portais de Notícias
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {newsSearchUrls.map((portal, idx) => (
+                    <a
+                      key={idx}
+                      href={portal.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {portal.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Official Sources Section */}
+              <div className="mt-4">
+                <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                  <Scale className="w-4 h-4" />
+                  Consultar Fontes Oficiais
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {officialSearchUrls.map((portal, idx) => (
+                    <a
+                      key={idx}
+                      href={portal.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {portal.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">
+                  Dados obtidos via Google Custom Search API
+                </p>
+                <button
+                  onClick={() => setShowNewsModal(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
