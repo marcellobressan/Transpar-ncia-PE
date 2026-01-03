@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Politician, EfficiencyRating, AmendmentHistory, SpendingRecord, CandidacyStatus, AdvisorStats } from '../types';
 import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
@@ -211,22 +211,23 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const FilterButton = ({ type, label, icon: Icon }: { type: SpendingFilter, label: string, icon?: React.ElementType }) => (
     <button
       onClick={() => setActiveFilter(type)}
-      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border ${
+      aria-pressed={activeFilter === type}
+      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ease-out-expo flex items-center gap-2 border focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
         activeFilter === type
-          ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105'
+          ? 'bg-slate-800 text-white border-slate-800 shadow-md'
           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
       }`}
     >
-      {Icon && <Icon className="w-4 h-4" />}
+      {Icon && <Icon className="w-4 h-4" aria-hidden="true" />}
       {label}
     </button>
   );
 
   const getRatingBadge = (rating: string) => {
     const r = rating.toLowerCase();
-    if (r.includes('falso') || r.includes('false') || r.includes('mentira')) return <span className="flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full"><XCircle className="w-3 h-3"/> Falso</span>;
-    if (r.includes('verdade') || r.includes('true')) return <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3"/> Verdadeiro</span>;
-    return <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full"><HelpCircle className="w-3 h-3"/> {rating}</span>;
+    if (r.includes('falso') || r.includes('false') || r.includes('mentira')) return <span className="badge badge-danger"><XCircle className="w-3 h-3" aria-hidden="true" /> Falso</span>;
+    if (r.includes('verdade') || r.includes('true')) return <span className="badge badge-success"><CheckCircle className="w-3 h-3" aria-hidden="true" /> Verdadeiro</span>;
+    return <span className="badge badge-warning"><HelpCircle className="w-3 h-3" aria-hidden="true" /> {rating}</span>;
   };
 
   const getSeverityColor = (severity: string) => {
@@ -239,101 +240,106 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   };
 
   return (
-    <div className="animate-fade-in-up pb-20">
+    <article className="animate-in pb-20" aria-labelledby="politician-name">
       {/* Back Button Floating */}
       <button 
         onClick={onBack}
-        className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white p-4 rounded-full shadow-xl hover:bg-brand-600 transition-all hover:scale-110 md:static md:bg-transparent md:text-brand-600 md:shadow-none md:p-0 md:hover:bg-transparent md:mb-6 md:flex md:items-center md:gap-2 md:font-semibold"
+        aria-label="Voltar para a lista de políticos"
+        className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white p-4 rounded-full shadow-xl hover:bg-brand-600 transition-all duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 md:static md:bg-transparent md:text-brand-600 md:shadow-none md:p-0 md:hover:bg-transparent md:mb-6 md:flex md:items-center md:gap-2 md:font-semibold md:focus-visible:ring-brand-500 md:focus-visible:ring-offset-white"
       >
-        <ChevronLeft className="w-5 h-5" />
+        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
         <span className="hidden md:inline">Voltar para a lista</span>
       </button>
 
       {/* SEÇÃO 1 - PERFIL HERO */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-        <div className="h-32 bg-gradient-to-r from-slate-900 to-slate-800 relative">
+      <header className="card overflow-hidden mb-8">
+        <div className="h-32 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative">
            <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px'}}></div>
         </div>
-        <div className="px-8 pb-8">
-          <div className="flex flex-col md:flex-row items-start md:items-end -mt-14 mb-8 gap-8">
-            <div className="relative">
+        <div className="px-6 md:px-8 pb-8">
+          <div className="flex flex-col md:flex-row items-start md:items-end -mt-14 mb-8 gap-6 md:gap-8">
+            <div className="relative flex-shrink-0">
               <img 
                 src={deputyPhotoOverride || politician.photoUrl} 
-                alt={politician.name}
-                className="w-40 h-40 rounded-2xl border-4 border-white shadow-lg bg-slate-100 object-cover"
+                alt={`Foto de ${politician.name}`}
+                className="w-32 h-32 md:w-40 md:h-40 rounded-2xl border-4 border-white shadow-lg bg-slate-100 object-cover"
+                loading="eager"
               />
               <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-lg shadow-md border border-slate-100">
                 <img 
                   src={PARTY_LOGOS[politician.party] || PARTY_LOGOS['DEFAULT']} 
-                  alt={politician.party}
+                  alt={`Logo do partido ${politician.party}`}
                   className="w-8 h-8 object-contain"
                 />
               </div>
             </div>
             
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{politician.name}</h1>
+                <h1 id="politician-name" className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">{politician.name}</h1>
                 <EfficiencyBadge rating={politician.efficiencyRating} />
               </div>
               
-              <div className="flex flex-wrap gap-2 text-sm">
-                <span className="px-3 py-1 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.currentRole}</span>
-                <span className="px-3 py-1 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.sphere}</span>
-                <span className="px-3 py-1 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200 flex items-center gap-1"><MapPin className="w-3 h-3"/> {politician.location}</span>
+              <div className="flex flex-wrap gap-2 text-sm" role="list" aria-label="Informações do político">
+                <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.currentRole}</span>
+                <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.sphere}</span>
+                <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> {politician.location}
+                </span>
                 
                 {politician.candidacyStatus === CandidacyStatus.CONFIRMADA && (
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 flex items-center gap-1">
-                    <UserCheck className="w-3 h-3" /> Candidato: {politician.disputedRole}
+                  <span role="listitem" className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" aria-hidden="true" /> Candidato: {politician.disputedRole}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-slate-100">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
-              <div className="flex items-center gap-1 mb-1">
-                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Total (10 Anos)</p>
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 pt-6 border-t border-slate-100" role="list" aria-label="Métricas financeiras">
+            <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
+              <div className="flex items-center gap-1.5 mb-1">
+                 <p className="metric-label">Total (10 Anos)</p>
                  <Tooltip content="Soma de todos os gastos de gabinete, emendas e salários declarados na última década." position="bottom">
-                   <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                   <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className="text-xl lg:text-2xl font-black text-brand-700 truncate" title={FORMATTER_BRL.format(politician.totalSpending10Years)}>
+              <p className="text-lg md:text-2xl font-black text-brand-700 truncate" title={FORMATTER_BRL.format(politician.totalSpending10Years)}>
                 {FORMATTER_BRL.format(politician.totalSpending10Years)}
               </p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
-              <div className="flex items-center gap-1 mb-1">
-                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Custo / Eleitor</p>
+            <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
+              <div className="flex items-center gap-1.5 mb-1">
+                 <p className="metric-label">Custo / Eleitor</p>
                  <Tooltip content="Quanto o mandato deste político custou para cada eleitor da sua região/estado." position="bottom">
-                   <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                   <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className="text-xl lg:text-2xl font-black text-slate-800">R$ {politician.spendingPerCapita.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-slate-800">R$ {politician.spendingPerCapita.toFixed(2)}</p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Tendência</p>
+            <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
+              <p className="metric-label mb-1">Tendência</p>
               <div className="flex items-center gap-2">
-                 <p className="text-xl lg:text-2xl font-black text-slate-800">{politician.spendingTrend}</p>
-                 {politician.spendingTrend === 'Crescente' && <div className="w-2 h-2 rounded-full bg-red-500"></div>}
-                 {politician.spendingTrend === 'Decrescente' && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                 <p className="text-lg md:text-2xl font-black text-slate-800">{politician.spendingTrend}</p>
+                 {politician.spendingTrend === 'Crescente' && <span className="w-2.5 h-2.5 rounded-full bg-rose-500" aria-label="Tendência negativa"></span>}
+                 {politician.spendingTrend === 'Decrescente' && <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" aria-label="Tendência positiva"></span>}
               </div>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
-              <div className="flex items-center gap-1 mb-1">
-                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Vs. Partido</p>
+            <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
+              <div className="flex items-center gap-1.5 mb-1">
+                 <p className="metric-label">Vs. Partido</p>
                  <Tooltip content="Comparação percentual dos gastos deste político em relação à média dos colegas do mesmo partido." position="bottom">
-                   <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                   <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className={`text-xl lg:text-2xl font-black ${politician.partyAverageComparison > 1 ? 'text-red-600' : 'text-emerald-600'}`}>
+              <p className={`text-lg md:text-2xl font-black ${politician.partyAverageComparison > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {((politician.partyAverageComparison - 1) * 100).toFixed(0)}% <span className="text-sm font-semibold">{politician.partyAverageComparison > 1 ? 'Acima' : 'Abaixo'}</span>
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         

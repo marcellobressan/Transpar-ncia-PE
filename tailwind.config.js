@@ -7,7 +7,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      fontSize: {
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
       colors: {
         brand: {
@@ -24,6 +27,15 @@ export default {
           950: '#082f49',
         }
       },
+      spacing: {
+        '18': '4.5rem',
+        '22': '5.5rem',
+        '30': '7.5rem',
+      },
+      borderRadius: {
+        '4xl': '2rem',
+        '5xl': '2.5rem',
+      },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',
         'fade-in-up': 'fadeInUp 0.6s ease-out',
@@ -31,6 +43,8 @@ export default {
         'slide-in-left': 'slideInLeft 0.3s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'bounce-in': 'bounceIn 0.5s ease-out',
+        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'shimmer': 'shimmer 2s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -59,6 +73,14 @@ export default {
           '70%': { transform: 'scale(0.9)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
       backdropBlur: {
         xs: '2px',
@@ -66,6 +88,17 @@ export default {
       boxShadow: {
         'glow': '0 0 20px rgba(14, 165, 233, 0.3)',
         'glow-lg': '0 0 40px rgba(14, 165, 233, 0.4)',
+        'inner-sm': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'elevated': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1), 0 0 0 1px rgb(0 0 0 / 0.05)',
+        'elevated-lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+      },
+      transitionDuration: {
+        '250': '250ms',
+        '350': '350ms',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'out-back': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
     },
   },

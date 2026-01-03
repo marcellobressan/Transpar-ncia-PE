@@ -75,81 +75,85 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({ politicians }) => {
   };
 
   return (
-    <div className="overflow-x-auto w-full pb-12"> {/* Padding bottom extra para tooltips da ultima linha */}
-      <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
+    <div className="overflow-x-auto w-full pb-12" role="region" aria-label="Tabela comparativa de políticos">
+      <table className="table-accessible" aria-describedby="table-description">
+        <caption id="table-description" className="sr-only">
+          Tabela comparativa mostrando informações sobre políticos incluindo status eleitoral, cargo, gastos, alertas e eficiência
+        </caption>
+        <thead>
           <tr>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Político</th>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Eleitoral</th>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Cargo / Esfera</th>
-            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <div className="flex items-center justify-end gap-1">
+            <th scope="col">Político</th>
+            <th scope="col">Status Eleitoral</th>
+            <th scope="col">Cargo / Esfera</th>
+            <th scope="col" className="text-right">
+              <div className="flex items-center justify-end gap-1.5">
                 Gastos (Mandato)
                 <Tooltip content="Total acumulado declarado no último mandato completo ou atual. Inclui verba de gabinete e salários." position="top">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" aria-label="Informações sobre gastos" />
                 </Tooltip>
               </div>
             </th>
-            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <div className="flex items-center gap-1">
+            <th scope="col">
+              <div className="flex items-center gap-1.5">
                 Alertas
-                <Tooltip content="Monitoramento de processos judiciais, " position="top">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                <Tooltip content="Monitoramento de processos judiciais e irregularidades" position="top">
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" aria-label="Informações sobre alertas" />
                 </Tooltip>
               </div>
             </th>
-            <th scope="col" className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <div className="flex items-center justify-center gap-1">
+            <th scope="col" className="text-center">
+              <div className="flex items-center justify-center gap-1.5">
                 Eficiência
                 <Tooltip content="Índice calculado cruzando custo por voto, presença e projetos aprovados." position="top">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" aria-label="Informações sobre eficiência" />
                 </Tooltip>
               </div>
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-slate-100">
+        <tbody>
           {politicians.map((pol) => (
-            <tr key={pol.id} className="hover:bg-slate-50/80 transition-colors group cursor-default">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center">
+            <tr key={pol.id} className="group">
+              <td className="whitespace-nowrap">
+                <div className="flex items-center gap-4">
                   <div className="flex-shrink-0 h-11 w-11 relative">
                     <img 
                       className="h-11 w-11 rounded-full object-contain bg-white border border-slate-200 p-0.5" 
                       src={PARTY_LOGOS[pol.party] || PARTY_LOGOS['DEFAULT']} 
-                      alt={`Logo ${pol.party}`} 
+                      alt="" 
+                      aria-hidden="true"
                     />
                   </div>
-                  <div className="ml-4">
-                    <div className="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors">{pol.name}</div>
-                    <div className="text-xs font-medium text-slate-500 bg-slate-100 px-1.5 rounded w-fit mt-0.5">{pol.party}</div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors duration-200">{pol.name}</div>
+                    <div className="text-xs font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded w-fit mt-0.5">{pol.party}</div>
                   </div>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm">
+              <td className="whitespace-nowrap text-sm">
                 <div className="flex flex-col gap-1 items-start">
                    {getStatusBadge(pol.candidacyStatus)}
                    {pol.disputedRole && (
                      <div className="flex items-center gap-1 text-xs text-slate-500 mt-1 pl-1">
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3 h-3" aria-hidden="true" />
                         Alvo: <span className="font-semibold text-slate-700">{pol.disputedRole}</span>
                      </div>
                    )}
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-slate-700">{pol.currentRole}</div>
+              <td className="whitespace-nowrap">
+                <div className="text-sm text-slate-700 font-medium">{pol.currentRole}</div>
                 <div className="text-xs text-slate-400 font-medium">{pol.sphere}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm font-bold text-slate-900">
+              <td className="whitespace-nowrap text-right">
+                <div className="text-sm font-bold text-slate-900 tabular-nums">
                   {FORMATTER_BRL.format(pol.totalSpendingLastMandate)}
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="whitespace-nowrap">
                 {getRedFlagsIndicator(pol.redFlags)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-center">
+              <td className="whitespace-nowrap text-center">
                 <div className="flex justify-center">
                    <EfficiencyBadge rating={pol.efficiencyRating} />
                 </div>
