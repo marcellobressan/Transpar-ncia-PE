@@ -76,7 +76,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   };
 
   // Computed Data
-  const displaySalaryData = realSalaryData || politician.salaryHistory.map(r => ({
+  const displaySalaryData = realSalaryData || (politician.salaryHistory ?? []).map(r => ({
     name: r.year.toString(),
     amount: r.amount,
   }));
@@ -88,8 +88,13 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
     executed: h.executed
   }));
 
-  const ceapDisplayData = ceapDataOverride || politician.ceapHistory;
-  const advisorDisplayData = advisorStatsOverride || politician.advisorStats;
+  const ceapDisplayData = ceapDataOverride || (politician.ceapHistory ?? []);
+  const advisorDisplayData = advisorStatsOverride || (politician.advisorStats ?? {
+    totalAdvisors: 0,
+    maxAdvisors: 0,
+    monthlyCost: 0,
+    maxMonthlyCost: 0
+  });
 
   const AVAILABLE_YEARS = [2024, 2023, 2022, 2021, 2020];
 
@@ -299,10 +304,10 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
               </div>
               
               <div className="flex flex-wrap gap-2 text-sm" role="list" aria-label="Informações do político">
-                <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.currentRole}</span>
+                <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.currentRole ?? politician.position ?? 'Cargo não informado'}</span>
                 <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200">{politician.sphere}</span>
                 <span role="listitem" className="px-3 py-1.5 bg-slate-100 rounded-full text-slate-700 font-medium border border-slate-200 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> {politician.location}
+                  <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> {politician.location ?? politician.state ?? 'PE'}
                 </span>
                 
                 {politician.candidacyStatus === CandidacyStatus.CONFIRMADA && (
@@ -323,8 +328,8 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                    <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className="text-lg md:text-2xl font-black text-brand-700 truncate" title={FORMATTER_BRL.format(politician.totalSpending10Years)}>
-                {FORMATTER_BRL.format(politician.totalSpending10Years)}
+              <p className="text-lg md:text-2xl font-black text-brand-700 truncate" title={FORMATTER_BRL.format(politician.totalSpending10Years ?? 0)}>
+                {FORMATTER_BRL.format(politician.totalSpending10Years ?? 0)}
               </p>
             </div>
             <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
@@ -334,12 +339,12 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                    <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className="text-lg md:text-2xl font-black text-slate-800">R$ {politician.spendingPerCapita.toFixed(2)}</p>
+              <p className="text-lg md:text-2xl font-black text-slate-800">R$ {(politician.spendingPerCapita ?? 0).toFixed(2)}</p>
             </div>
             <div role="listitem" className="metric-card bg-slate-50/80 border-slate-100 hover:border-brand-200 transition-all duration-200">
               <p className="metric-label mb-1">Tendência</p>
               <div className="flex items-center gap-2">
-                 <p className="text-lg md:text-2xl font-black text-slate-800">{politician.spendingTrend}</p>
+                 <p className="text-lg md:text-2xl font-black text-slate-800">{politician.spendingTrend ?? 'N/D'}</p>
                  {politician.spendingTrend === 'Crescente' && <span className="w-2.5 h-2.5 rounded-full bg-rose-500" aria-label="Tendência negativa"></span>}
                  {politician.spendingTrend === 'Decrescente' && <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" aria-label="Tendência positiva"></span>}
               </div>
@@ -351,8 +356,8 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                    <Info className="w-3 h-3 text-slate-400 cursor-help" aria-label="Mais informações" />
                  </Tooltip>
               </div>
-              <p className={`text-lg md:text-2xl font-black ${politician.partyAverageComparison > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {((politician.partyAverageComparison - 1) * 100).toFixed(0)}% <span className="text-sm font-semibold">{politician.partyAverageComparison > 1 ? 'Acima' : 'Abaixo'}</span>
+              <p className={`text-lg md:text-2xl font-black ${(politician.partyAverageComparison ?? 1) > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {(((politician.partyAverageComparison ?? 1) - 1) * 100).toFixed(0)}% <span className="text-sm font-semibold">{(politician.partyAverageComparison ?? 1) > 1 ? 'Acima' : 'Abaixo'}</span>
               </p>
             </div>
           </div>
@@ -621,9 +626,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                 {politician.redFlagsSummary}
               </div>
 
-              {politician.redFlags.length > 0 ? (
+              {(politician.redFlags ?? []).length > 0 ? (
                 <div className="space-y-3 relative z-10">
-                  {politician.redFlags.map((flag) => (
+                  {(politician.redFlags ?? []).map((flag) => (
                     <div key={flag.id} className={`p-4 rounded-xl border bg-white shadow-sm ${getSeverityColor(flag.severity)}`}>
                        <div className="flex gap-3">
                          <div className="mt-0.5">{flag.severity === 'HIGH' ? <AlertOctagon className="w-4 h-4 text-rose-600"/> : <AlertTriangle className="w-4 h-4 text-amber-500"/>}</div>
@@ -681,7 +686,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                Principais Insights
              </h3>
              <ul className="space-y-4">
-               {politician.keyFindings.map((finding, idx) => (
+               {(politician.keyFindings ?? []).map((finding, idx) => (
                  <li key={idx} className="flex gap-3 text-sm text-slate-600">
                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-brand-400 mt-2"></span>
                    {finding}
