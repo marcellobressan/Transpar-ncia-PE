@@ -459,12 +459,49 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   };
 
   const getSeverityColor = (severity: string) => {
-    switch(severity) {
+    switch(severity?.toUpperCase()) {
       case 'HIGH': return 'bg-rose-50 border-rose-200';
       case 'MEDIUM': return 'bg-amber-50 border-amber-200';
       case 'LOW': return 'bg-blue-50 border-blue-200';
       default: return 'bg-slate-50 border-slate-200';
     }
+  };
+
+  const getSeverityInfo = (severity: string) => {
+    switch(severity?.toUpperCase()) {
+      case 'HIGH': return { label: 'Alto Risco', color: 'bg-rose-500', textColor: 'text-rose-700', icon: AlertOctagon };
+      case 'MEDIUM': return { label: 'Atenção', color: 'bg-amber-500', textColor: 'text-amber-700', icon: AlertTriangle };
+      case 'LOW': return { label: 'Baixo', color: 'bg-blue-500', textColor: 'text-blue-700', icon: Info };
+      default: return { label: 'Info', color: 'bg-slate-500', textColor: 'text-slate-700', icon: Info };
+    }
+  };
+
+  const getRedFlagCategory = (flag: typeof politician.redFlags[0]) => {
+    const title = (flag.title || flag.description || '').toLowerCase();
+    if (title.includes('cota') || title.includes('ceap') || title.includes('verba') || title.includes('gasto')) {
+      return { name: 'Uso de Verbas', icon: Coins, color: 'text-amber-600' };
+    }
+    if (title.includes('processo') || title.includes('condenação') || title.includes('improbidade') || title.includes('criminal')) {
+      return { name: 'Processo Judicial', icon: Siren, color: 'text-rose-600' };
+    }
+    if (title.includes('patrimônio') || title.includes('declaração') || title.includes('evolução')) {
+      return { name: 'Patrimônio', icon: Building2, color: 'text-purple-600' };
+    }
+    if (title.includes('emenda') || title.includes('licitação') || title.includes('contrato')) {
+      return { name: 'Contratações', icon: FileText, color: 'text-indigo-600' };
+    }
+    if (title.includes('assessor') || title.includes('funcionário') || title.includes('parente') || title.includes('nepotismo')) {
+      return { name: 'Recursos Humanos', icon: Users, color: 'text-cyan-600' };
+    }
+    return { name: 'Outros', icon: ShieldAlert, color: 'text-slate-600' };
+  };
+
+  // Contadores de severidade
+  const redFlagStats = {
+    high: politician.redFlags?.filter(f => f.severity?.toUpperCase() === 'HIGH').length || 0,
+    medium: politician.redFlags?.filter(f => f.severity?.toUpperCase() === 'MEDIUM').length || 0,
+    low: politician.redFlags?.filter(f => f.severity?.toUpperCase() === 'LOW').length || 0,
+    total: politician.redFlags?.length || 0,
   };
 
   return (
@@ -1272,71 +1309,280 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
         {/* COLUNA DIREITA - ALERTA E CONTEXTO */}
         <div className="space-y-8">
            
-           {/* RED FLAGS CARD */}
-           <div className={`p-6 rounded-3xl border shadow-sm relative overflow-hidden ${politician.redFlags.some(f => f.severity === 'HIGH') ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                 <div className={`p-2 rounded-xl ${politician.redFlags.some(f => f.severity === 'HIGH') ? 'bg-rose-200 text-rose-700' : 'bg-brand-100 text-brand-600'}`}>
-                    <ShieldAlert className="w-6 h-6" />
-                 </div>
-                 <h3 className={`text-lg font-bold ${politician.redFlags.some(f => f.severity === 'HIGH') ? 'text-rose-900' : 'text-slate-800'}`}>
-                   Pontos de Atenção
-                 </h3>
-              </div>
-
-              <div className="bg-white/60 p-4 rounded-xl border border-black/5 text-sm text-slate-700 leading-relaxed mb-6 backdrop-blur-sm">
-                {politician.redFlagsSummary}
-              </div>
-
-              {(politician.redFlags ?? []).length > 0 ? (
-                <div className="space-y-3 relative z-10">
-                  {(politician.redFlags ?? []).map((flag) => (
-                    <div key={flag.id} className={`p-4 rounded-xl border bg-white shadow-sm ${getSeverityColor(flag.severity)}`}>
-                       <div className="flex gap-3">
-                         <div className="mt-0.5">{flag.severity === 'HIGH' ? <AlertOctagon className="w-4 h-4 text-rose-600"/> : <AlertTriangle className="w-4 h-4 text-amber-500"/>}</div>
-                         <div>
-                           <h4 className="font-bold text-sm text-slate-800">{flag.title}</h4>
-                           <p className="text-xs text-slate-500 mt-1 line-clamp-2">{flag.description}</p>
-                           <a href={flag.sourceUrl} target="_blank" className="mt-2 text-[10px] font-bold text-brand-600 uppercase tracking-wide flex items-center gap-1 hover:underline">
-                             Ver Fonte <ExternalLink className="w-2.5 h-2.5" />
-                           </a>
-                         </div>
-                       </div>
+           {/* RED FLAGS CARD - APRIMORADO */}
+           <div className={`rounded-3xl border shadow-sm relative overflow-hidden ${
+             redFlagStats.high > 0 
+               ? 'bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200' 
+               : redFlagStats.total > 0 
+                 ? 'bg-gradient-to-br from-amber-50 to-amber-100/30 border-amber-200'
+                 : 'bg-gradient-to-br from-emerald-50 to-emerald-100/30 border-emerald-200'
+           }`}>
+              {/* Header com Score Visual */}
+              <div className="p-6 pb-4">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl ${
+                      redFlagStats.high > 0 
+                        ? 'bg-rose-200 text-rose-700' 
+                        : redFlagStats.total > 0 
+                          ? 'bg-amber-200 text-amber-700'
+                          : 'bg-emerald-200 text-emerald-700'
+                    }`}>
+                      <ShieldAlert className="w-7 h-7" />
                     </div>
-                  ))}
+                    <div>
+                      <h3 className={`text-xl font-bold ${
+                        redFlagStats.high > 0 ? 'text-rose-900' : redFlagStats.total > 0 ? 'text-amber-900' : 'text-emerald-900'
+                      }`}>
+                        Pontos de Atenção
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Análise de integridade e transparência</p>
+                    </div>
+                  </div>
+                  
+                  {/* Score Indicator */}
+                  <div className={`px-4 py-2 rounded-2xl text-center ${
+                    redFlagStats.high > 0 
+                      ? 'bg-rose-200/80' 
+                      : redFlagStats.total > 0 
+                        ? 'bg-amber-200/80'
+                        : 'bg-emerald-200/80'
+                  }`}>
+                    <span className={`text-2xl font-black ${
+                      redFlagStats.high > 0 ? 'text-rose-700' : redFlagStats.total > 0 ? 'text-amber-700' : 'text-emerald-700'
+                    }`}>
+                      {redFlagStats.total}
+                    </span>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${
+                      redFlagStats.high > 0 ? 'text-rose-600' : redFlagStats.total > 0 ? 'text-amber-600' : 'text-emerald-600'
+                    }`}>
+                      {redFlagStats.total === 0 ? 'Limpo' : redFlagStats.total === 1 ? 'Alerta' : 'Alertas'}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3 text-emerald-800">
-                   <CheckCircle className="w-5 h-5" />
-                   <p className="text-sm font-medium">Sem irregularidades graves nas fontes verificadas.</p>
-                </div>
-              )}
 
-              {/* Fact Check Tool */}
-              <div className="mt-6 pt-6 border-t border-black/10">
-                 <div className="flex justify-between items-center mb-3">
-                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                     <CheckSquare className="w-3 h-3" /> Fact Check Google
-                   </span>
-                   <button onClick={handleFetchFactCheck} disabled={isLoadingFactCheck} className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded shadow-sm hover:bg-slate-50 disabled:opacity-50">
-                     {isLoadingFactCheck ? 'Verificando...' : 'Verificar Agora'}
-                   </button>
-                 </div>
-                 
-                 {factCheckError && <p className="text-xs text-red-500">{factCheckError}</p>}
-                 
-                 {factChecks && factChecks.length > 0 && (
-                   <div className="space-y-2">
-                     {factChecks.slice(0, 2).map((claim, idx) => (
-                       <div key={idx} className="bg-white p-2 rounded border border-slate-100 text-xs shadow-sm">
-                         <p className="font-medium text-slate-800 mb-1 line-clamp-2">"{claim.text}"</p>
-                         <div className="flex justify-between items-center">
-                            {getRatingBadge(claim.claimReview[0].textualRating)}
-                            <a href={claim.claimReview[0].url} target="_blank" className="text-brand-600 hover:underline">Ler</a>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 )}
+                {/* Severity Breakdown */}
+                {redFlagStats.total > 0 && (
+                  <div className="flex gap-2 mb-4">
+                    {redFlagStats.high > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-100 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <span className="text-xs font-bold text-rose-700">{redFlagStats.high} Alto Risco</span>
+                      </div>
+                    )}
+                    {redFlagStats.medium > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                        <span className="text-xs font-bold text-amber-700">{redFlagStats.medium} Atenção</span>
+                      </div>
+                    )}
+                    {redFlagStats.low > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        <span className="text-xs font-bold text-blue-700">{redFlagStats.low} Baixo</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Summary */}
+                <div className="bg-white/70 backdrop-blur-sm p-4 rounded-2xl border border-white/50 shadow-sm">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {politician.redFlagsSummary}
+                  </p>
+                </div>
+              </div>
+
+              {/* Red Flags List */}
+              <div className="px-6 pb-6">
+                {(politician.redFlags ?? []).length > 0 ? (
+                  <div className="space-y-3">
+                    {(politician.redFlags ?? []).map((flag) => {
+                      const severityInfo = getSeverityInfo(flag.severity);
+                      const category = getRedFlagCategory(flag);
+                      const SeverityIcon = severityInfo.icon;
+                      const CategoryIcon = category.icon;
+                      
+                      return (
+                        <div 
+                          key={flag.id || flag.description} 
+                          className={`p-4 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-shadow ${getSeverityColor(flag.severity)}`}
+                        >
+                          <div className="flex gap-4">
+                            {/* Severity Icon */}
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                              flag.severity?.toUpperCase() === 'HIGH' 
+                                ? 'bg-rose-100' 
+                                : flag.severity?.toUpperCase() === 'MEDIUM' 
+                                  ? 'bg-amber-100' 
+                                  : 'bg-blue-100'
+                            }`}>
+                              <SeverityIcon className={`w-5 h-5 ${severityInfo.textColor}`} />
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              {/* Header with Category & Severity */}
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                  flag.severity?.toUpperCase() === 'HIGH' 
+                                    ? 'bg-rose-100 text-rose-700' 
+                                    : flag.severity?.toUpperCase() === 'MEDIUM' 
+                                      ? 'bg-amber-100 text-amber-700' 
+                                      : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {severityInfo.label}
+                                </span>
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 ${category.color}`}>
+                                  <CategoryIcon className="w-3 h-3" />
+                                  {category.name}
+                                </span>
+                                {flag.date && (
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {new Date(flag.date).toLocaleDateString('pt-BR')}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Title & Description */}
+                              <h4 className="font-bold text-sm text-slate-800 mb-1">
+                                {flag.title || 'Ponto de Atenção'}
+                              </h4>
+                              <p className="text-xs text-slate-600 leading-relaxed">
+                                {flag.description}
+                              </p>
+                              
+                              {/* Source */}
+                              <div className="mt-3 flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <Database className="w-3 h-3" />
+                                  Fonte: {flag.source}
+                                </span>
+                                {flag.sourceUrl && (
+                                  <a 
+                                    href={flag.sourceUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-brand-600 uppercase tracking-wide flex items-center gap-1 hover:text-brand-700 transition-colors"
+                                  >
+                                    Verificar <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-5 bg-emerald-100/80 border border-emerald-200 rounded-2xl">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 bg-emerald-200 rounded-xl">
+                        <CheckCircle className="w-6 h-6 text-emerald-700" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-emerald-900 mb-1">Nenhuma Irregularidade Detectada</h4>
+                        <p className="text-sm text-emerald-700">
+                          Não foram encontradas condenações, processos por improbidade ou irregularidades graves nas fontes verificadas (TCU, CGU, MPF, TSE).
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-200 rounded-lg text-[10px] font-medium text-emerald-800">
+                            <CheckCircle className="w-3 h-3" /> TCU Verificado
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-200 rounded-lg text-[10px] font-medium text-emerald-800">
+                            <CheckCircle className="w-3 h-3" /> CGU Verificado
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-200 rounded-lg text-[10px] font-medium text-emerald-800">
+                            <CheckCircle className="w-3 h-3" /> TSE Verificado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Fact Check Section */}
+              <div className="mx-6 mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-brand-100 rounded-lg">
+                      <CheckSquare className="w-4 h-4 text-brand-600" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">Verificação de Fatos</span>
+                  </div>
+                  <button 
+                    onClick={handleFetchFactCheck} 
+                    disabled={isLoadingFactCheck} 
+                    className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  >
+                    {isLoadingFactCheck ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3 h-3" />
+                        Buscar no Google Fact Check
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {factCheckError && (
+                  <p className="text-xs text-rose-600 bg-rose-50 px-3 py-2 rounded-lg">{factCheckError}</p>
+                )}
+                
+                {!factChecks && !factCheckError && !isLoadingFactCheck && (
+                  <p className="text-xs text-slate-500">
+                    Clique para buscar verificações de fatos sobre este político na API do Google Fact Check.
+                  </p>
+                )}
+                
+                {factChecks && factChecks.length === 0 && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                    <CheckCircle className="w-4 h-4" />
+                    Nenhuma verificação de fatos encontrada para este nome.
+                  </div>
+                )}
+                
+                {factChecks && factChecks.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {factChecks.slice(0, 3).map((claim, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                        <p className="font-medium text-slate-800 text-xs mb-2 line-clamp-2">"{claim.text}"</p>
+                        <div className="flex justify-between items-center">
+                          {getRatingBadge(claim.claimReview[0].textualRating)}
+                          <a 
+                            href={claim.claimReview[0].url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1"
+                          >
+                            Ler mais <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Fontes Verificadas */}
+              <div className="px-6 pb-6">
+                <div className="p-4 bg-slate-100/80 rounded-2xl">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Fontes Consultadas</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Portal da Transparência', 'TCU', 'CGU', 'TSE', 'Câmara dos Deputados', 'Serenata de Amor'].map((fonte, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-white rounded-lg text-[10px] font-medium text-slate-600 border border-slate-200">
+                        {fonte}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
            </div>
 
