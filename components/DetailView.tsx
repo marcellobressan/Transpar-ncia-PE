@@ -57,13 +57,31 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
 
   const [activeFilter, setActiveFilter] = useState<SpendingFilter>('TODOS');
 
+  // Helper para normalizar amendments (pode ser array ou objeto)
+  const normalizeAmendments = (amendments: typeof politician.amendments): RealAmendmentData => {
+    if (Array.isArray(amendments)) {
+      // Se for array, converte para o formato de objeto
+      const totalProposed = amendments.reduce((sum, a) => sum + a.proposed, 0);
+      const totalExecuted = amendments.reduce((sum, a) => sum + a.executed, 0);
+      return {
+        totalProposed,
+        totalExecuted,
+        topAreas: [],
+        geoDistribution: [],
+        history: amendments
+      };
+    }
+    // Já é objeto, retorna diretamente
+    return amendments;
+  };
+
   // Computed Data
   const displaySalaryData = realSalaryData || politician.salaryHistory.map(r => ({
     name: r.year.toString(),
     amount: r.amount,
   }));
 
-  const displayAmendments = realAmendmentStats || politician.amendments;
+  const displayAmendments = realAmendmentStats || normalizeAmendments(politician.amendments);
   const amendmentHistoryData = displayAmendments.history.map(h => ({
     year: h.year.toString(),
     proposed: h.proposed,
