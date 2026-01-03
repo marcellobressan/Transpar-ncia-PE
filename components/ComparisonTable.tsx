@@ -2,7 +2,8 @@ import React from 'react';
 import { Politician, CandidacyStatus } from '../types';
 import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
-import { AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import Tooltip from './Tooltip';
+import { AlertCircle, CheckCircle2, AlertTriangle, ArrowRight, HelpCircle } from 'lucide-react';
 
 interface ComparisonTableProps {
   politicians: Politician[];
@@ -13,11 +14,25 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({ politicians }) => {
   const getStatusBadge = (status: CandidacyStatus) => {
     switch (status) {
       case CandidacyStatus.CONFIRMADA:
-        return <span className="px-2 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 border border-green-200">Confirmada</span>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5"></span>
+            Confirmada
+          </span>
+        );
       case CandidacyStatus.PRE_CANDIDATO:
-        return <span className="px-2 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">Pré-Candidato</span>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1.5"></span>
+             Pré-Candidato
+          </span>
+        );
       case CandidacyStatus.NAO_CANDIDATO:
-        return <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-600 border border-gray-200">Não Concorre</span>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
+             Não Concorre
+          </span>
+        );
       default:
         return null;
     }
@@ -29,84 +44,115 @@ const ComparisonTable: React.FC<ComparisonTableProps> = ({ politicians }) => {
 
     if (highSeverity > 0) {
       return (
-        <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded border border-red-200">
-          <AlertCircle className="w-3 h-3" /> {highSeverity} Crítico(s)
-        </span>
+        <Tooltip content="Processos judiciais, condenações ou irregularidades graves identificadas." position="top">
+          <span className="flex items-center w-fit gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-100 cursor-help">
+            <AlertCircle className="w-3.5 h-3.5" /> {highSeverity} Crítico(s)
+          </span>
+        </Tooltip>
       );
     }
     if (mediumSeverity > 0) {
       return (
-        <span className="flex items-center gap-1 text-xs font-bold text-orange-700 bg-orange-100 px-2 py-1 rounded border border-orange-200">
-          <AlertTriangle className="w-3 h-3" /> {mediumSeverity} Atenção
-        </span>
+        <Tooltip content="Investigações em andamento ou apontamentos de Tribunais de Contas." position="top">
+          <span className="flex items-center w-fit gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100 cursor-help">
+            <AlertTriangle className="w-3.5 h-3.5" /> {mediumSeverity} Atenção
+          </span>
+        </Tooltip>
       );
     }
     if (flags.length > 0) {
        return (
-        <span className="flex items-center gap-1 text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+        <span className="flex items-center w-fit gap-1.5 text-xs font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
           {flags.length} Nota(s)
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100">
-        <CheckCircle2 className="w-3 h-3" /> Nada Consta
+      <span className="flex items-center w-fit gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100 opacity-80">
+        <CheckCircle2 className="w-3.5 h-3.5" /> Nada Consta
       </span>
     );
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm bg-white">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto w-full pb-12"> {/* Padding bottom extra para tooltips da ultima linha */}
+      <table className="min-w-full divide-y divide-slate-200">
+        <thead className="bg-slate-50">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Político / Partido</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Situação</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo Atual</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gasto (Último Mandato)</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bandeiras Vermelhas</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eficiência</th>
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Político</th>
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Eleitoral</th>
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Cargo / Esfera</th>
+            <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center justify-end gap-1">
+                Gastos (Mandato)
+                <Tooltip content="Total acumulado declarado no último mandato completo ou atual. Inclui verba de gabinete e salários." position="top">
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                </Tooltip>
+              </div>
+            </th>
+            <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-1">
+                Alertas
+                <Tooltip content="Monitoramento de processos judiciais, " position="top">
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                </Tooltip>
+              </div>
+            </th>
+            <th scope="col" className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center justify-center gap-1">
+                Eficiência
+                <Tooltip content="Índice calculado cruzando custo por voto, presença e projetos aprovados." position="top">
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                </Tooltip>
+              </div>
+            </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-slate-100">
           {politicians.map((pol) => (
-            <tr key={pol.id} className="hover:bg-gray-50 transition-colors">
+            <tr key={pol.id} className="hover:bg-slate-50/80 transition-colors group cursor-default">
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 h-10 w-10">
+                  <div className="flex-shrink-0 h-11 w-11 relative">
                     <img 
-                      className="h-10 w-10 rounded-full object-contain bg-white border border-gray-200 p-0.5" 
+                      className="h-11 w-11 rounded-full object-contain bg-white border border-slate-200 p-0.5" 
                       src={PARTY_LOGOS[pol.party] || PARTY_LOGOS['DEFAULT']} 
                       alt={`Logo ${pol.party}`} 
                     />
                   </div>
                   <div className="ml-4">
-                    <div className="text-sm font-medium text-gray-900">{pol.name}</div>
-                    <div className="text-sm text-gray-500">{pol.party}</div>
+                    <div className="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors">{pol.name}</div>
+                    <div className="text-xs font-medium text-slate-500 bg-slate-100 px-1.5 rounded w-fit mt-0.5">{pol.party}</div>
                   </div>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 items-start">
                    {getStatusBadge(pol.candidacyStatus)}
                    {pol.disputedRole && (
-                     <span className="text-xs text-gray-500">Alvo: {pol.disputedRole}</span>
+                     <div className="flex items-center gap-1 text-xs text-slate-500 mt-1 pl-1">
+                        <ArrowRight className="w-3 h-3" />
+                        Alvo: <span className="font-semibold text-slate-700">{pol.disputedRole}</span>
+                     </div>
                    )}
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {pol.currentRole}
-                <br />
-                <span className="text-xs text-gray-400">{pol.sphere}</span>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-slate-700">{pol.currentRole}</div>
+                <div className="text-xs text-slate-400 font-medium">{pol.sphere}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                {FORMATTER_BRL.format(pol.totalSpendingLastMandate)}
+              <td className="px-6 py-4 whitespace-nowrap text-right">
+                <div className="text-sm font-bold text-slate-900">
+                  {FORMATTER_BRL.format(pol.totalSpendingLastMandate)}
+                </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 {getRedFlagsIndicator(pol.redFlags)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <EfficiencyBadge rating={pol.efficiencyRating} />
+              <td className="px-6 py-4 whitespace-nowrap text-center">
+                <div className="flex justify-center">
+                   <EfficiencyBadge rating={pol.efficiencyRating} />
+                </div>
               </td>
             </tr>
           ))}
