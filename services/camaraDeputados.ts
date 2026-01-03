@@ -595,7 +595,7 @@ export const getDeputadosSOAP = async (): Promise<DeputadoSOAP[]> => {
     const deputados: DeputadoSOAP[] = [];
     const deputadoMatches = xmlText.match(/<deputado>([\s\S]*?)<\/deputado>/g) || [];
     
-    deputadoMatches.forEach(deputadoXml => {
+    deputadoMatches.forEach((deputadoXml: string) => {
       const getValue = (tag: string): string => {
         const match = deputadoXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
         return match ? match[1].trim() : '';
@@ -657,7 +657,7 @@ export const getLideresBancadas = async (): Promise<{ partido: string; lider: st
     
     const bancadaMatches = xmlText.match(/<bancada>([\s\S]*?)<\/bancada>/g) || [];
     
-    bancadaMatches.forEach(bancadaXml => {
+    bancadaMatches.forEach((bancadaXml: string) => {
       const getValue = (tag: string): string => {
         const match = bancadaXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
         return match ? match[1].trim() : '';
