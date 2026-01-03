@@ -4,10 +4,11 @@ import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
 import Tooltip from './Tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
-import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2 } from 'lucide-react';
 import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
+import { getLinksConsulta, getResumoFontes, LinkConsulta, PORTAIS_PE } from '../services/transparenciaPE';
 
 interface DetailViewProps {
   candidate: Politician;
@@ -98,8 +99,29 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
 
   const AVAILABLE_YEARS = [2024, 2023, 2022, 2021, 2020];
 
+  // Helper para identificar o tipo de político
+  const getPoliticianType = (): 'deputado' | 'senador' | 'executivo' | 'outro' => {
+    const role = (politician.currentRole ?? politician.position ?? '').toLowerCase();
+    if (role.includes('deputad')) return 'deputado';
+    if (role.includes('senador')) return 'senador';
+    if (role.includes('governador') || role.includes('prefeito') || role.includes('ministro') || role.includes('secretário')) return 'executivo';
+    return 'outro';
+  };
+
+  const politicianType = getPoliticianType();
+  const isLegislativo = politicianType === 'deputado' || politicianType === 'senador';
+
   // --- Handlers (mantendo a lógica original) ---
   const handleSyncSalary = async () => {
+    // Deputados e senadores não estão no Portal da Transparência (Executivo Federal)
+    if (isLegislativo) {
+      const sourceInfo = politicianType === 'deputado' 
+        ? 'Câmara dos Deputados (dados já carregados via API da Câmara)'
+        : 'Senado Federal (dados já carregados via API do Senado)';
+      setSalaryError(`${politicianType === 'deputado' ? 'Deputados' : 'Senadores'} não constam no Portal da Transparência (apenas servidores do Executivo Federal). Fonte de dados: ${sourceInfo}`);
+      return;
+    }
+
     setIsSyncingSalary(true);
     setSalaryError(null);
     setRealSalaryData(null);
@@ -385,7 +407,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
 
           {(activeFilter === 'TODOS' || activeFilter === 'REMUNERACAO') && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 hover:border-brand-100 transition-colors">
-              <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+              <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-brand-500" />
@@ -400,27 +422,49 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                         className="bg-transparent text-xs font-semibold text-slate-700 py-1.5 pl-2 pr-6 rounded-lg focus:outline-none cursor-pointer"
                         value={salaryYear}
                         onChange={(e) => setSalaryYear(Number(e.target.value))}
-                        disabled={isSyncingSalary}
+                        disabled={isSyncingSalary || isLegislativo}
                       >
                         {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                       <Calendar className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                    </div>
                    <div className="w-px h-6 bg-slate-200"></div>
-                   <button 
-                    onClick={handleSyncSalary}
-                    disabled={isSyncingSalary}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-2 transition ${
-                      realSalaryData 
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                        : 'bg-brand-600 text-white hover:bg-brand-700 shadow-md'
-                    }`}
-                  >
-                    {isSyncingSalary ? <RefreshCw className="w-3 h-3 animate-spin" /> : realSalaryData ? <CheckCircle className="w-3 h-3" /> : <Database className="w-3 h-3" />}
-                    {isSyncingSalary ? 'Sincronizando...' : 'Conectar Portal'}
-                  </button>
+                   {isLegislativo ? (
+                     <span className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-500 flex items-center gap-2">
+                       <Info className="w-3 h-3" />
+                       {politicianType === 'deputado' ? 'Dados via Câmara' : 'Dados via Senado'}
+                     </span>
+                   ) : (
+                     <button 
+                      onClick={handleSyncSalary}
+                      disabled={isSyncingSalary}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-2 transition ${
+                        realSalaryData 
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          : 'bg-brand-600 text-white hover:bg-brand-700 shadow-md'
+                      }`}
+                    >
+                      {isSyncingSalary ? <RefreshCw className="w-3 h-3 animate-spin" /> : realSalaryData ? <CheckCircle className="w-3 h-3" /> : <Database className="w-3 h-3" />}
+                      {isSyncingSalary ? 'Sincronizando...' : 'Conectar Portal'}
+                    </button>
+                   )}
                 </div>
               </div>
+
+              {/* Banner informativo para Legislativo */}
+              {isLegislativo && (
+                <div className="mb-6 bg-blue-50 border border-blue-100 text-blue-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                  <Info className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                  <div>
+                    <p className="font-semibold">Fonte: {politicianType === 'deputado' ? 'Câmara dos Deputados' : 'Senado Federal'}</p>
+                    <p className="text-blue-600 mt-1">
+                      {politicianType === 'deputado' 
+                        ? 'Os subsídios de deputados federais são fixos e definidos por decreto legislativo. Os dados de despesas de gabinete (CEAP) são obtidos da API da Câmara.'
+                        : 'Os subsídios de senadores são fixos e definidos por decreto legislativo. Os dados de despesas são obtidos da API do Senado.'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {salaryError && (
                 <div className="mb-6 bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
@@ -695,6 +739,83 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
              </ul>
            </div>
 
+           {/* LINKS PARA PORTAIS DE TRANSPARÊNCIA DE PE */}
+           <div className="bg-gradient-to-br from-brand-50 to-blue-50 p-6 rounded-3xl border border-brand-100">
+             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+               <Link2 className="w-5 h-5 text-brand-500" />
+               Consultar Fontes Oficiais
+             </h3>
+             <p className="text-sm text-slate-600 mb-4">
+               Acesse diretamente os portais de transparência para dados completos:
+             </p>
+             
+             <div className="space-y-3">
+               {getLinksConsulta(
+                 politician.name, 
+                 politician.currentRole ?? politician.position,
+                 politician.sphere as any
+               ).slice(0, 5).map((link, idx) => (
+                 <a
+                   key={idx}
+                   href={link.url}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-md transition-all group"
+                 >
+                   <div className="flex items-center gap-3">
+                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                       link.tipo === 'remuneracao' ? 'bg-emerald-100 text-emerald-600' :
+                       link.tipo === 'despesas' ? 'bg-amber-100 text-amber-600' :
+                       link.tipo === 'servidores' ? 'bg-blue-100 text-blue-600' :
+                       'bg-slate-100 text-slate-600'
+                     }`}>
+                       {link.tipo === 'remuneracao' ? <FileText className="w-4 h-4" /> :
+                        link.tipo === 'despesas' ? <BarChart2 className="w-4 h-4" /> :
+                        link.tipo === 'servidores' ? <Users className="w-4 h-4" /> :
+                        <Globe className="w-4 h-4" />}
+                     </div>
+                     <div>
+                       <p className="text-sm font-semibold text-slate-800 group-hover:text-brand-600 transition-colors">
+                         {link.descricao}
+                       </p>
+                       <p className="text-xs text-slate-500">{link.portal}</p>
+                     </div>
+                   </div>
+                   <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-brand-500 transition-colors" />
+                 </a>
+               ))}
+             </div>
+
+             {/* Portais de PE - Links Rápidos */}
+             <div className="mt-6 pt-4 border-t border-brand-100">
+               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                 Portais de Transparência de PE
+               </p>
+               <div className="flex flex-wrap gap-2">
+                 <a href={PORTAIS_PE.estadual.home} target="_blank" rel="noopener noreferrer" 
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                   🏛️ Governo de PE
+                 </a>
+                 <a href={PORTAIS_PE.recife.home} target="_blank" rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                   🌆 Prefeitura de Recife
+                 </a>
+                 <a href={PORTAIS_PE.mppe.home} target="_blank" rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                   ⚖️ MP-PE
+                 </a>
+                 <a href={PORTAIS_PE.federal.localidade} target="_blank" rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                   🇧🇷 Portal Federal - PE
+                 </a>
+                 <a href={PORTAIS_PE.estadual.remuneracoes} target="_blank" rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                   💰 Remunerações PE
+                 </a>
+               </div>
+             </div>
+           </div>
+
            {/* DISPONIBILIDADE DE DADOS */}
            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
               <div className="flex items-center justify-between mb-4">
@@ -705,13 +826,25 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
               </div>
               <div className="flex items-center gap-4 mb-2">
                  <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${politician.dataAvailabilityScore > 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{width: `${politician.dataAvailabilityScore}%`}}></div>
+                    <div className={`h-full rounded-full ${(politician.dataAvailabilityScore ?? 50) > 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{width: `${politician.dataAvailabilityScore ?? 50}%`}}></div>
                  </div>
-                 <span className="font-bold text-slate-700">{politician.dataAvailabilityScore}%</span>
+                 <span className="font-bold text-slate-700">{politician.dataAvailabilityScore ?? 50}%</span>
               </div>
-              <p className="text-xs text-slate-500">
-                 {politician.dataAvailabilityScore > 90 ? 'Excelente disponibilidade de dados públicos.' : 'Alguns dados podem estar incompletos nas fontes oficiais.'}
+              <p className="text-xs text-slate-500 mb-4">
+                 {(politician.dataAvailabilityScore ?? 50) > 90 ? 'Excelente disponibilidade de dados públicos.' : 'Alguns dados podem estar incompletos nas fontes oficiais.'}
               </p>
+              
+              {/* Fontes de dados utilizadas */}
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Fontes de Dados</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {getResumoFontes(politician.currentRole ?? politician.position, politician.sphere as any).map((fonte, idx) => (
+                    <span key={idx} className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-medium text-slate-600">
+                      {fonte}
+                    </span>
+                  ))}
+                </div>
+              </div>
            </div>
 
         </div>
