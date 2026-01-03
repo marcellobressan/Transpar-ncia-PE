@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import type { PieLabelRenderProps } from 'recharts';
 import { Upload, FileText, AlertTriangle, CheckCircle, Download, Filter, Search, X, Database, BarChart2, PieChart as PieChartIcon, Table, RefreshCw, FileDown, Info, MapPin } from 'lucide-react';
 import { 
   processarCSVEmendas, 
@@ -406,7 +407,11 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
                           cx="50%"
                           cy="50%"
                           outerRadius={100}
-                          label={({ name, percent }: { name: string; percent: number }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          label={(props: PieLabelRenderProps) => {
+                            const name = props.name ?? '';
+                            const percent = props.percent ?? 0;
+                            return `${name} (${(percent * 100).toFixed(0)}%)`;
+                          }}
                           labelLine={false}
                         >
                           {dadosPizza.map((entry, index) => (
