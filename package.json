@@ -6,17 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:init": "npx tsx services/initDb.ts",
+    "db:test": "npx tsx -e \"import { testConnection } from './services/database'; testConnection().then(() => process.exit(0));\""
   },
   "dependencies": {
-    "recharts": "^3.6.0",
-    "react-dom": "^19.2.3",
+    "@neondatabase/serverless": "^1.0.2",
+    "lucide-react": "^0.562.0",
     "react": "^19.2.3",
-    "lucide-react": "^0.562.0"
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.19.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
