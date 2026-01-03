@@ -4,8 +4,8 @@ import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
 import Tooltip from './Tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
-import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins } from 'lucide-react';
-import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda } from '../services/portalTransparencia';
+import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code } from 'lucide-react';
+import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda, getUrlsAnalise, PORTAL_URLS, DOWNLOAD_URLS } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
 import { getLinksConsulta, getResumoFontes, LinkConsulta, PORTAIS_PE } from '../services/transparenciaPE';
@@ -909,20 +909,113 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                  </div>
                )}
 
-               {/* Erro ao buscar */}
+               {/* Erro ao buscar - mostrar recursos alternativos */}
                {emendasError && (
-                 <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
-                   <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
-                   <div>
-                     <p className="font-semibold">{emendasError}</p>
-                     <a 
-                       href={getUrlConsultaEmendas(politician.name)} 
-                       target="_blank" 
-                       rel="noopener noreferrer" 
-                       className="inline-flex items-center gap-1 mt-2 text-amber-700 hover:text-amber-900 font-semibold"
-                     >
-                       Consultar manualmente no Portal <ExternalLink className="w-3 h-3" />
-                     </a>
+                 <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-800 px-4 py-4 rounded-xl text-sm">
+                   <div className="flex items-start gap-3 mb-4">
+                     <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
+                     <div>
+                       <p className="font-semibold">{emendasError}</p>
+                       <p className="text-amber-600 mt-1 text-xs">
+                         A API pode estar temporariamente indisponível (CORS) ou não há dados para este parlamentar. Use os recursos abaixo:
+                       </p>
+                     </div>
+                   </div>
+                   
+                   {/* Recursos alternativos */}
+                   <div className="bg-white/50 rounded-lg p-4 space-y-4">
+                     <h5 className="font-bold text-amber-900 text-sm flex items-center gap-2">
+                       <Database className="w-4 h-4" />
+                       Fontes de Dados do Portal da Transparência
+                     </h5>
+                     
+                     {/* Consulta Online */}
+                     <div className="space-y-2">
+                       <p className="text-xs font-semibold text-amber-800">🔍 Consulta Online</p>
+                       <div className="flex flex-wrap gap-2">
+                         <a 
+                           href={getUrlConsultaEmendas(politician.name, 2024)} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <Search className="w-3 h-3" /> Buscar emendas 2024
+                         </a>
+                         <a 
+                           href={getUrlConsultaEmendas(politician.name, 2023)} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <Search className="w-3 h-3" /> Buscar emendas 2023
+                         </a>
+                         <a 
+                           href={`${PORTAL_URLS.transferencias}?uf=PE&de=${encodeURIComponent(politician.name)}`}
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <MapPin className="w-3 h-3" /> Transferências para PE
+                         </a>
+                       </div>
+                     </div>
+
+                     {/* Download de Dados */}
+                     <div className="space-y-2">
+                       <p className="text-xs font-semibold text-amber-800">📥 Download de Dados (CSV)</p>
+                       <div className="flex flex-wrap gap-2">
+                         <a 
+                           href={DOWNLOAD_URLS.emendas(2024)} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <FileDown className="w-3 h-3" /> Emendas 2024 (CSV)
+                         </a>
+                         <a 
+                           href={DOWNLOAD_URLS.emendas(2023)} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <FileDown className="w-3 h-3" /> Emendas 2023 (CSV)
+                         </a>
+                         <a 
+                           href={PORTAL_URLS.downloadDados} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <Database className="w-3 h-3" /> Todos os downloads
+                         </a>
+                       </div>
+                     </div>
+
+                     {/* API */}
+                     <div className="space-y-2">
+                       <p className="text-xs font-semibold text-amber-800">🔗 API (para desenvolvedores)</p>
+                       <div className="flex flex-wrap gap-2">
+                         <a 
+                           href={PORTAL_URLS.api} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <Code className="w-3 h-3" /> Documentação API
+                         </a>
+                         <a 
+                           href={`https://api.portaldatransparencia.gov.br/api-de-dados/emendas?nomeAutor=${encodeURIComponent(politician.name)}&ano=2024&pagina=1`} 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100 transition border border-amber-200"
+                         >
+                           <FileJson className="w-3 h-3" /> Exemplo JSON
+                         </a>
+                       </div>
+                       <p className="text-[10px] text-amber-600 mt-1">
+                         A API requer chave de acesso. Cadastre-se em dados.gov.br para obter a sua.
+                       </p>
+                     </div>
                    </div>
                  </div>
                )}
@@ -1057,6 +1150,55 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                        </div>
                      </div>
                    )}
+
+                   {/* Fontes de Dados - Links para Portal */}
+                   <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
+                     <h4 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
+                       <Database className="w-4 h-4" />
+                       Fontes de Dados Oficiais
+                     </h4>
+                     <p className="text-xs text-blue-600 mb-3">
+                       Dados obtidos via API do Portal da Transparência. Explore mais recursos:
+                     </p>
+                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                       <a 
+                         href={getUrlConsultaEmendas(politician.name, 2024)} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="flex flex-col items-center gap-1 p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-sm transition text-center group"
+                       >
+                         <Search className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
+                         <span className="text-[10px] font-medium text-blue-700">Consulta Online</span>
+                       </a>
+                       <a 
+                         href={DOWNLOAD_URLS.emendas(2024)} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="flex flex-col items-center gap-1 p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-sm transition text-center group"
+                       >
+                         <FileDown className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
+                         <span className="text-[10px] font-medium text-blue-700">Download CSV</span>
+                       </a>
+                       <a 
+                         href={PORTAL_URLS.api} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="flex flex-col items-center gap-1 p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-sm transition text-center group"
+                       >
+                         <Code className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
+                         <span className="text-[10px] font-medium text-blue-700">API Swagger</span>
+                       </a>
+                       <a 
+                         href={PORTAL_URLS.downloadDados} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="flex flex-col items-center gap-1 p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-sm transition text-center group"
+                       >
+                         <Database className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
+                         <span className="text-[10px] font-medium text-blue-700">Todos Downloads</span>
+                       </a>
+                     </div>
+                   </div>
                  </>
                )}
 

@@ -1,6 +1,59 @@
 export const API_KEY = '9133530778e9c7f8e161806b556373bd';
 export const BASE_URL = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 
+// URLs de download direto de dados do Portal da Transparência
+// https://portaldatransparencia.gov.br/download-de-dados
+export const DOWNLOAD_URLS = {
+  // Emendas parlamentares - arquivos CSV por ano
+  emendas: (ano: number) => `https://portaldatransparencia.gov.br/download-de-dados/emendas/${ano}`,
+  
+  // Despesas de execução - contém detalhes de pagamentos
+  despesasExecucao: (ano: number, mes: string) => 
+    `https://portaldatransparencia.gov.br/download-de-dados/despesas-execucao/${ano}${mes}`,
+  
+  // Transferências - recursos repassados a estados/municípios
+  transferencias: (ano: number, mes: string) =>
+    `https://portaldatransparencia.gov.br/download-de-dados/transferencias/${ano}${mes}`,
+  
+  // Convênios
+  convenios: () => `https://portaldatransparencia.gov.br/download-de-dados/convenios`,
+  
+  // CEIS - Cadastro de Empresas Inidôneas e Suspensas
+  ceis: () => `https://portaldatransparencia.gov.br/download-de-dados/ceis`,
+  
+  // CEPIM - Cadastro de Entidades Privadas Sem Fins Lucrativos Impedidas
+  cepim: () => `https://portaldatransparencia.gov.br/download-de-dados/cepim`,
+  
+  // Servidores federais
+  servidores: (ano: number, mes: string) =>
+    `https://portaldatransparencia.gov.br/download-de-dados/servidores/${ano}${mes}`,
+  
+  // Cartões de pagamento (CPGF)
+  cpgf: (ano: number, mes: string) =>
+    `https://portaldatransparencia.gov.br/download-de-dados/cpgf/${ano}${mes}`,
+  
+  // Licitações
+  licitacoes: (ano: number, mes: string) =>
+    `https://portaldatransparencia.gov.br/download-de-dados/licitacoes/${ano}${mes}`,
+  
+  // Contratos
+  contratos: (ano: number, mes: string) =>
+    `https://portaldatransparencia.gov.br/download-de-dados/contratos/${ano}${mes}`,
+};
+
+// URLs de consulta no portal
+export const PORTAL_URLS = {
+  emendas: 'https://portaldatransparencia.gov.br/emendas',
+  emendasConsulta: 'https://portaldatransparencia.gov.br/emendas/consulta',
+  despesas: 'https://portaldatransparencia.gov.br/despesas',
+  transferencias: 'https://portaldatransparencia.gov.br/transferencias',
+  convenios: 'https://portaldatransparencia.gov.br/convenios',
+  servidores: 'https://portaldatransparencia.gov.br/servidores',
+  beneficios: 'https://portaldatransparencia.gov.br/beneficios',
+  api: 'https://api.portaldatransparencia.gov.br/swagger-ui/index.html',
+  downloadDados: 'https://portaldatransparencia.gov.br/download-de-dados',
+};
+
 // Flag para desativar chamadas à API quando CORS falha
 let corsBlocked = false;
 
@@ -564,18 +617,48 @@ export const fetchEmendasPorTipo = async (
 };
 
 /**
- * Gera URL para consulta manual no portal
+ * Gera URL para consulta no portal com filtros
  */
 export const getUrlConsultaEmendas = (nomeAutor: string, ano?: number): string => {
   const params = new URLSearchParams({
-    ordenarPor: 'autor',
-    direcao: 'asc',
+    ordenarPor: 'valorEmpenhado',
+    direcao: 'desc',
   });
   if (nomeAutor) params.append('de', nomeAutor);
   if (ano) params.append('ano', ano.toString());
   
-  return `https://portaldatransparencia.gov.br/emendas/consulta?${params.toString()}`;
+  return `${PORTAL_URLS.emendasConsulta}?${params.toString()}`;
 };
+
+/**
+ * Gera URL para download de dados de emendas em CSV
+ */
+export const getUrlDownloadEmendas = (ano: number): string => {
+  return DOWNLOAD_URLS.emendas(ano);
+};
+
+/**
+ * Gera URLs úteis para análise aprofundada
+ */
+export const getUrlsAnalise = (nomeAutor: string, ano: number = 2024) => ({
+  // Consulta de emendas com filtro por autor
+  consultaEmendas: getUrlConsultaEmendas(nomeAutor, ano),
+  
+  // Download de todos os dados de emendas do ano (CSV ~100MB)
+  downloadEmendasAno: DOWNLOAD_URLS.emendas(ano),
+  
+  // Página geral de downloads
+  paginaDownloads: PORTAL_URLS.downloadDados,
+  
+  // Documentação da API
+  documentacaoApi: PORTAL_URLS.api,
+  
+  // Consulta de transferências para PE
+  transferenciasUF: `${PORTAL_URLS.transferencias}?uf=PE&ano=${ano}`,
+  
+  // Consulta de convênios com PE
+  conveniosUF: `${PORTAL_URLS.convenios}?uf=PE&situacao=1`,
+});
 
 /**
  * Formata valor monetário em texto legível
@@ -586,3 +669,228 @@ export const formatarValorEmenda = (valor: number): string => {
   if (valor >= 1000) return `R$ ${(valor / 1000).toFixed(0)} mil`;
   return `R$ ${valor.toFixed(2)}`;
 };
+
+// ============================================
+// ENDPOINTS ADICIONAIS DA API
+// ============================================
+
+/**
+ * Busca informações de documentos de emenda específicos
+ * Endpoint: /emendas/{codigo}
+ */
+export const fetchEmendaPorCodigo = async (codigoEmenda: string): Promise<EmendaDetalhada | null> => {
+  if (corsBlocked) return null;
+
+  try {
+    const url = `${BASE_URL}/emendas/${codigoEmenda}`;
+    const response = await fetch(url, {
+      headers: { 'chave-api-dados': API_KEY, 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!data) return null;
+
+    const empenhado = parseBRL(data.valorEmpenhado);
+    const pago = parseBRL(data.valorPago);
+
+    return {
+      codigoEmenda: data.codigoEmenda || codigoEmenda,
+      ano: data.ano || 0,
+      tipoEmenda: data.tipoEmenda || 'Não informado',
+      nomeAutor: data.nomeAutor || data.autor?.nome || 'Não informado',
+      localidade: data.localidadeDoGasto || data.localidade || 'Nacional',
+      funcao: data.funcao || 'Não classificado',
+      subfuncao: data.subfuncao || '',
+      valorEmpenhado: empenhado,
+      valorPago: pago,
+      percentualExecutado: empenhado > 0 ? Math.round((pago / empenhado) * 100) : 0,
+    };
+  } catch (error) {
+    console.error('Erro ao buscar emenda por código:', error);
+    return null;
+  }
+};
+
+/**
+ * Busca documentos/favorecidos de uma emenda específica
+ * Endpoint: /emendas/documentos
+ */
+export const fetchDocumentosEmenda = async (
+  codigoEmenda: string,
+  ano: number
+): Promise<{ favorecido: string; valor: number; documento: string }[]> => {
+  if (corsBlocked) return [];
+
+  try {
+    const url = `${BASE_URL}/emendas/documentos?codigoEmenda=${codigoEmenda}&ano=${ano}&pagina=1`;
+    const response = await fetch(url, {
+      headers: { 'chave-api-dados': API_KEY, 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((doc: any) => ({
+      favorecido: doc.nomeFavorecido || doc.favorecido || 'Não informado',
+      valor: parseBRL(doc.valor || doc.valorDocumento),
+      documento: doc.documento || doc.numeroDocumento || '',
+    }));
+  } catch (error) {
+    console.error('Erro ao buscar documentos da emenda:', error);
+    return [];
+  }
+};
+
+/**
+ * Busca transferências para um estado/município específico
+ * Endpoint: /transferencias
+ */
+export const fetchTransferenciasUF = async (
+  uf: string = 'PE',
+  ano: number = 2024
+): Promise<{ programa: string; valor: number; municipio: string }[]> => {
+  if (corsBlocked) return [];
+
+  try {
+    const url = `${BASE_URL}/transferencias?uf=${uf}&ano=${ano}&pagina=1&quantidade=100`;
+    const response = await fetch(url, {
+      headers: { 'chave-api-dados': API_KEY, 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((t: any) => ({
+      programa: t.programa || t.nomePrograma || 'Não informado',
+      valor: parseBRL(t.valor || t.valorTransferido),
+      municipio: t.municipio || t.nomeMunicipio || uf,
+    }));
+  } catch (error) {
+    console.error('Erro ao buscar transferências:', error);
+    return [];
+  }
+};
+
+/**
+ * Tipo de resposta para dados de emendas com informações completas
+ */
+export interface DadosEmendasCompletos {
+  resumo: ResumoEmendasAutor | null;
+  urlsConsulta: ReturnType<typeof getUrlsAnalise>;
+  dadosDisponiveis: boolean;
+  mensagem: string;
+  ultimaAtualizacao: string;
+}
+
+/**
+ * Função consolidada para obter todos os dados de emendas de um parlamentar
+ * Retorna os dados da API (se disponível) + URLs de recursos alternativos
+ */
+export const fetchDadosEmendasCompletos = async (
+  nomeAutor: string,
+  anos: number[] = [2024, 2023, 2022, 2021, 2020]
+): Promise<DadosEmendasCompletos> => {
+  const urlsConsulta = getUrlsAnalise(nomeAutor, anos[0]);
+  
+  try {
+    const resumo = await fetchResumoEmendasAutor(nomeAutor, anos);
+    
+    return {
+      resumo,
+      urlsConsulta,
+      dadosDisponiveis: resumo !== null && resumo.totalEmendas > 0,
+      mensagem: resumo 
+        ? `Encontradas ${resumo.totalEmendas} emendas totalizando ${formatarValorEmenda(resumo.valorTotalEmpenhado)}`
+        : 'Dados não encontrados via API. Use os links de consulta alternativos.',
+      ultimaAtualizacao: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      resumo: null,
+      urlsConsulta,
+      dadosDisponiveis: false,
+      mensagem: 'Erro ao acessar a API do Portal da Transparência. Use os links de consulta alternativos.',
+      ultimaAtualizacao: new Date().toISOString(),
+    };
+  }
+};
+
+/**
+ * Verifica se a API do Portal está acessível e retorna informações de status
+ */
+export const getStatusApi = async (): Promise<{
+  disponivel: boolean;
+  mensagem: string;
+  alternativas: string[];
+}> => {
+  if (corsBlocked) {
+    return {
+      disponivel: false,
+      mensagem: 'API bloqueada por CORS. O navegador não permite acesso direto à API.',
+      alternativas: [
+        'Use a consulta online no Portal da Transparência',
+        'Baixe os dados em CSV na página de downloads',
+        'Use a API em um servidor backend (não no navegador)',
+      ],
+    };
+  }
+
+  const disponivel = await checkApiAccess();
+  
+  return {
+    disponivel,
+    mensagem: disponivel 
+      ? 'API acessível e funcionando normalmente'
+      : 'API temporariamente indisponível',
+    alternativas: disponivel ? [] : [
+      'Use a consulta online no Portal da Transparência',
+      'Baixe os dados em CSV na página de downloads',
+    ],
+  };
+};
+
+// ============================================
+// DOCUMENTAÇÃO DE ENDPOINTS DISPONÍVEIS
+// ============================================
+/**
+ * Referência rápida dos endpoints da API do Portal da Transparência:
+ * 
+ * EMENDAS:
+ * - GET /emendas - Lista emendas parlamentares (filtros: ano, nomeAutor, tipoEmenda, uf)
+ * - GET /emendas/{codigo} - Detalhes de uma emenda específica
+ * - GET /emendas/documentos - Documentos/pagamentos de uma emenda
+ * 
+ * TRANSFERÊNCIAS:
+ * - GET /transferencias - Transferências para estados/municípios
+ * - GET /transferencias/por-uf - Agregado por UF
+ * 
+ * SERVIDORES:
+ * - GET /servidores - Busca servidores federais
+ * - GET /servidores/{id}/remuneracao - Remuneração de servidor
+ * 
+ * CONTRATOS:
+ * - GET /contratos - Lista contratos
+ * - GET /contratos/{id} - Detalhes de contrato
+ * 
+ * LICITAÇÕES:
+ * - GET /licitacoes - Lista licitações
+ * 
+ * CPGF (Cartão de Pagamento):
+ * - GET /cpgf - Gastos com cartão corporativo
+ * 
+ * CONVÊNIOS:
+ * - GET /convenios - Lista convênios
+ * 
+ * Documentação completa: https://api.portaldatransparencia.gov.br/swagger-ui/index.html
+ * 
+ * DOWNLOADS DE DADOS (CSV/JSON):
+ * - https://portaldatransparencia.gov.br/download-de-dados
+ * - Arquivos atualizados mensalmente
+ * - Inclui: emendas, despesas, transferências, servidores, contratos, etc.
+ */
