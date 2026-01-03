@@ -11,6 +11,12 @@ export enum EfficiencyRating {
   CRITICA = 'Crítica'
 }
 
+export enum CandidacyStatus {
+  CONFIRMADA = 'Candidatura Confirmada',
+  PRE_CANDIDATO = 'Pré-Candidato',
+  NAO_CANDIDATO = 'Não é candidato(a)'
+}
+
 export interface SpendingRecord {
   year: number;
   category: string;
@@ -25,18 +31,37 @@ export interface AmendmentHistory {
   executed: number;
 }
 
-export interface Candidate {
+export interface AdvisorStats {
+  totalAdvisors: number;
+  maxAdvisors: number; // Limite legal (ex: 25 para deputados federais)
+  monthlyCost: number;
+  maxMonthlyCost: number; // Verba de Gabinete (ex: ~R$ 118k)
+}
+
+export interface RedFlag {
+  id: string;
+  title: string;
+  description: string;
+  source: string;
+  sourceUrl: string;
+  date: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW'; // HIGH: Processo/Condenação, MEDIUM: Investigação, LOW: Questionamento
+}
+
+export interface Politician {
   id: string;
   name: string;
   party: string;
   currentRole: string;
-  disputedRole: string;
+  disputedRole: string | null; // Null se não for candidato
+  candidacyStatus: CandidacyStatus;
   sphere: Sphere;
   location: string; // e.g., "Pernambuco", "Recife"
   photoUrl: string;
   
   // Section 2: Summary
   totalSpending10Years: number;
+  totalSpendingLastMandate: number; // Novo campo
   spendingPerCapita: number;
   spendingTrend: 'Crescente' | 'Estável' | 'Decrescente';
   efficiencyRating: EfficiencyRating;
@@ -53,11 +78,18 @@ export interface Candidate {
     geoDistribution: string[]; // e.g., "Sertão", "Agreste"
     history: AmendmentHistory[];
   };
+
+  // Section 4: Cabinet & Staff
+  advisorStats: AdvisorStats;
+
+  // Section 5: Red Flags (Novo)
+  redFlagsSummary: string; // Resumo de parágrafo único (max 150 palavras)
+  redFlags: RedFlag[]; // Lista detalhada com fontes
   
-  // Section 5: Key Findings
+  // Section 6: Key Findings (Insights de dados, menos graves que Red Flags)
   keyFindings: string[];
   
-  // Section 6: Data Availability
+  // Section 7: Data Availability
   dataAvailabilityScore: number; // 0-100
   missingDataWarnings: string[];
 }
@@ -65,4 +97,5 @@ export interface Candidate {
 export interface FilterState {
   sphere: Sphere | 'All';
   search: string;
+  status: CandidacyStatus | 'All';
 }

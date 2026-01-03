@@ -1,4 +1,4 @@
-export const GOOGLE_API_KEY = ''; // Insira sua chave de API do Google Cloud aqui habilitada para Fact Check Tools
+export const GOOGLE_API_KEY = 'AIzaSyANdicbf8a-5qEgZnIn50aGp6CoYTUkIIw'; // Chave fornecida
 const BASE_URL = 'https://factchecktools.googleapis.com/v1alpha1/claims:search';
 
 export interface FactCheckReview {
