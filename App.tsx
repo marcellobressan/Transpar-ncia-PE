@@ -1,9 +1,21 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { MOCK_POLITICIANS, PARTY_LOGOS } from './constants';
-import { Sphere, CandidacyStatus } from './types';
+import { PARTY_LOGOS } from './constants';
+import { Sphere, CandidacyStatus, Politician } from './types';
 import ComparisonTable from './components/ComparisonTable';
 import DetailView from './components/DetailView';
-import { Search, BarChart2, Shield, AlertCircle, TrendingUp, Users, ChevronRight, Filter, X } from 'lucide-react';
+import { usePoliticians } from './hooks/usePoliticians';
+import { Search, BarChart2, Shield, AlertCircle, TrendingUp, Users, ChevronRight, Filter, X, RefreshCw, Loader2, Wifi, WifiOff, Database } from 'lucide-react';
+
+// Formatador de data/hora
+const formatDateTime = (isoDate: string): string => {
+  return new Date(isoDate).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 enum ViewState {
   LIST = 'list',
@@ -12,6 +24,17 @@ enum ViewState {
 }
 
 const App: React.FC = () => {
+  // Hook para carregar dados reais das APIs oficiais
+  const { 
+    politicians, 
+    loading, 
+    error, 
+    lastUpdated, 
+    apiStatus, 
+    refresh, 
+    isRefreshing 
+  } = usePoliticians();
+
   const [view, setView] = useState<ViewState>(ViewState.LIST);
   const [selectedPoliticianId, setSelectedPoliticianId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,7 +42,7 @@ const App: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<CandidacyStatus | 'All'>('All');
 
   const filteredPoliticians = useMemo(() => {
-    return MOCK_POLITICIANS.filter(c => {
+    return politicians.filter((c: Politician) => {
       const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             c.party.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSphere = sphereFilter === 'All' || c.sphere === sphereFilter;
@@ -27,7 +50,7 @@ const App: React.FC = () => {
       
       return matchesSearch && matchesSphere && matchesStatus;
     });
-  }, [searchTerm, sphereFilter, statusFilter]);
+  }, [politicians, searchTerm, sphereFilter, statusFilter]);
 
   const handleSelectPolitician = useCallback((id: string) => {
     setSelectedPoliticianId(id);
@@ -46,8 +69,30 @@ const App: React.FC = () => {
     setStatusFilter('All');
   }, []);
 
-  const selectedPolitician = MOCK_POLITICIANS.find(c => c.id === selectedPoliticianId);
+  const selectedPolitician = politicians.find((c: Politician) => c.id === selectedPoliticianId);
   const hasActiveFilters = searchTerm || sphereFilter !== 'All' || statusFilter !== 'All';
+
+  // Status indicator component
+  const StatusIndicator = () => {
+    const isOnline = apiStatus?.camara || apiStatus?.senado;
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        {isOnline ? (
+          <Wifi className="w-3.5 h-3.5 text-green-500" aria-hidden="true" />
+        ) : (
+          <WifiOff className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />
+        )}
+        <span className={`font-medium ${isOnline ? 'text-green-600' : 'text-amber-600'}`}>
+          {isOnline ? 'APIs Online' : 'Modo Offline'}
+        </span>
+        {lastUpdated && (
+          <span className="text-slate-400">
+            • Atualizado: {formatDateTime(lastUpdated.toISOString())}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -102,13 +147,60 @@ const App: React.FC = () => {
               Metodologia
             </button>
           </nav>
+
+          {/* Refresh Button & Status */}
+          <div className="flex items-center gap-3">
+            <StatusIndicator />
+            <button
+              onClick={refresh}
+              disabled={isRefreshing}
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-ring disabled:opacity-50"
+              aria-label={isRefreshing ? 'Atualizando dados...' : 'Atualizar dados'}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main id="main-content" className="flex-1 w-full pt-20" role="main">
         
-        {view === ViewState.LIST && (
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 animate-in">
+            <div className="relative">
+              <Database className="w-16 h-16 text-slate-200" aria-hidden="true" />
+              <Loader2 className="w-8 h-8 text-brand-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-spin" aria-hidden="true" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-slate-700">Carregando dados das APIs oficiais...</p>
+              <p className="text-sm text-slate-500 mt-1">
+                Consultando Câmara dos Deputados, Senado Federal e TSE
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="max-w-2xl mx-auto px-4 py-20">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" aria-hidden="true" />
+              <h2 className="text-lg font-semibold text-red-800 mb-2">Erro ao carregar dados</h2>
+              <p className="text-red-600 mb-4">{error}</p>
+              <button
+                onClick={refresh}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus-ring"
+              >
+                <RefreshCw className="w-4 h-4" aria-hidden="true" />
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && view === ViewState.LIST && (
           <div className="animate-in">
             {/* Hero Section */}
             <section 
@@ -268,7 +360,7 @@ const App: React.FC = () => {
                               </div>
                               
                               <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1 group-hover:text-brand-600 transition-colors duration-200">{c.name}</h4>
-                              <p className="text-sm text-slate-500 font-medium mb-4">{c.currentRole}</p>
+                              <p className="text-sm text-slate-500 font-medium mb-4">{c.currentRole || c.position}</p>
                               
                               {/* Metrics Mini-Grid */}
                               <div className="grid grid-cols-2 gap-2 mb-4 mt-auto">
