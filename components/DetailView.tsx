@@ -3,8 +3,9 @@ import { Politician, EfficiencyRating, AmendmentHistory, SpendingRecord, Candida
 import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
 import Tooltip from './Tooltip';
+import CSVEmendasViewer from './CSVEmendasViewer';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
-import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code, Upload } from 'lucide-react';
 import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda, getUrlsAnalise, PORTAL_URLS, DOWNLOAD_URLS } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
@@ -41,6 +42,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const [isLoadingEmendas, setIsLoadingEmendas] = useState(false);
   const [emendasError, setEmendasError] = useState<string | null>(null);
   const [resumoEmendas, setResumoEmendas] = useState<ResumoEmendasAutor | null>(null);
+  const [showCSVViewer, setShowCSVViewer] = useState(false);
 
   const [isSyncingSalary, setIsSyncingSalary] = useState(false);
   const [salaryError, setSalaryError] = useState<string | null>(null);
@@ -860,6 +862,13 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                         {isLoadingEmendas ? <RefreshCw className="w-3 h-3 animate-spin"/> : resumoEmendas ? <CheckCircle className="w-3 h-3"/> : <Database className="w-3 h-3"/>}
                         {isLoadingEmendas ? 'Buscando...' : resumoEmendas ? 'Atualizado' : 'Buscar Emendas'}
                      </button>
+                     <button 
+                       onClick={() => setShowCSVViewer(true)}
+                       className="text-xs px-3 py-1.5 rounded-lg font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200 flex items-center gap-2 transition"
+                     >
+                       <Upload className="w-3 h-3" />
+                       Analisar CSV
+                     </button>
                      <a 
                        href={getUrlConsultaEmendas(politician.name)} 
                        target="_blank" 
@@ -1014,6 +1023,20 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                        </div>
                        <p className="text-[10px] text-amber-600 mt-1">
                          A API requer chave de acesso. Cadastre-se em dados.gov.br para obter a sua.
+                       </p>
+                     </div>
+
+                     {/* Análise CSV */}
+                     <div className="mt-4 pt-4 border-t border-amber-200">
+                       <button
+                         onClick={() => setShowCSVViewer(true)}
+                         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition"
+                       >
+                         <Upload className="w-4 h-4" />
+                         Analisar CSV Baixado (com gráficos)
+                       </button>
+                       <p className="text-[10px] text-amber-600 mt-2 text-center">
+                         Baixe o CSV do Portal e faça upload para análise visual completa
                        </p>
                      </div>
                    </div>
@@ -1469,6 +1492,18 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
 
         </div>
       </div>
+
+      {/* Modal de Análise CSV */}
+      {showCSVViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <CSVEmendasViewer 
+              nomeAutorPadrao={politician.name}
+              onClose={() => setShowCSVViewer(false)}
+            />
+          </div>
+        </div>
+      )}
     </article>
   );
 };
