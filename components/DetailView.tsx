@@ -460,52 +460,26 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const handleSearchAlertNews = async (alertTitle: string, alertDescription: string) => {
     const query = buildAlertSearchQuery(politician.name, alertTitle, alertDescription);
     setCurrentSearchQuery(query);
-    setIsLoadingNews(true);
+    setNewsResults([]);
     setNewsError(null);
     setShowNewsModal(true);
-
-    try {
-      const response = await searchNews(query, { numResults: 8, dateRestrict: 'y2' });
-      if (response.error) {
-        setNewsError(response.error);
-        setNewsResults([]);
-      } else {
-        setNewsResults(response.results);
-      }
-    } catch (e) {
-      setNewsError('Erro ao buscar notícias. Use os links alternativos.');
-      setNewsResults([]);
-    } finally {
-      setIsLoadingNews(false);
-    }
+    // Nota: A API do Google Custom Search requer configuração de um CSE próprio
+    // Por enquanto, mostramos diretamente os links para os portais de notícias
   };
 
   // Handler para buscar notícias gerais sobre o político
   const handleSearchPoliticianNews = async () => {
     const query = `"${politician.name}" político Pernambuco`;
     setCurrentSearchQuery(query);
-    setIsLoadingNews(true);
+    setNewsResults([]);
     setNewsError(null);
     setShowNewsModal(true);
-
-    try {
-      const response = await searchNews(query, { numResults: 10, dateRestrict: 'y1' });
-      if (response.error) {
-        setNewsError(response.error);
-        setNewsResults([]);
-      } else {
-        setNewsResults(response.results);
-      }
-    } catch (e) {
-      setNewsError('Erro ao buscar notícias. Use os links alternativos.');
-      setNewsResults([]);
-    } finally {
-      setIsLoadingNews(false);
-    }
+    // Nota: A API do Google Custom Search requer configuração de um CSE próprio
+    // Por enquanto, mostramos diretamente os links para os portais de notícias
   };
 
   // URLs de busca de notícias e portais oficiais
-  const newsSearchUrls = getNewsSearchUrls(politician.name);
+  const newsSearchUrls = getNewsSearchUrls(currentSearchQuery || politician.name);
   const officialSearchUrls = getOfficialSearchUrls(politician.name);
 
   const FilterButton = ({ type, label, icon: Icon }: { type: SpendingFilter, label: string, icon?: React.ElementType }) => (
@@ -1912,12 +1886,6 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                   <RefreshCw className="w-8 h-8 text-brand-600 animate-spin mb-4" />
                   <p className="text-slate-600">Buscando notícias...</p>
                 </div>
-              ) : newsError ? (
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center">
-                  <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
-                  <p className="text-rose-700 font-medium mb-2">Erro na busca</p>
-                  <p className="text-sm text-rose-600">{newsError}</p>
-                </div>
               ) : newsResults.length > 0 ? (
                 <div className="space-y-4">
                   {newsResults.map((news, idx) => (
@@ -1943,18 +1911,21 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500 mb-2">Nenhum resultado encontrado na API</p>
-                  <p className="text-sm text-slate-400">Use os links abaixo para pesquisar em outros portais</p>
+                /* Quando não há resultados ou API falhou, mostrar links de forma proeminente */
+                <div className="text-center py-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
+                    <Search className="w-10 h-10 text-blue-500 mx-auto mb-3" />
+                    <p className="text-blue-800 font-medium mb-2">Pesquise nos portais de notícias</p>
+                    <p className="text-sm text-blue-600">Clique nos links abaixo para buscar "{currentSearchQuery}" diretamente nos principais portais</p>
+                  </div>
                 </div>
               )}
 
-              {/* Quick Links Section */}
-              <div className="mt-6 pt-6 border-t border-slate-200">
+              {/* Quick Links Section - Always visible */}
+              <div className={newsResults.length > 0 ? "mt-6 pt-6 border-t border-slate-200" : ""}>
                 <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                   <BookOpen className="w-4 h-4" />
-                  Pesquisar em Portais de Notícias
+                  🔎 Pesquisar em Portais de Notícias
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {newsSearchUrls.map((portal, idx) => (
@@ -1963,9 +1934,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                       href={portal.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors"
+                      className="flex items-center justify-center gap-2 px-3 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200 hover:border-blue-400"
                     >
-                      <ExternalLink className="w-3 h-3" />
+                      <span>{portal.icon}</span>
                       {portal.name}
                     </a>
                   ))}
@@ -1976,7 +1947,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
               <div className="mt-4">
                 <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                   <Scale className="w-4 h-4" />
-                  Consultar Fontes Oficiais
+                  ⚖️ Consultar Fontes Oficiais
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {officialSearchUrls.map((portal, idx) => (
@@ -1985,9 +1956,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                       href={portal.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors"
+                      className="flex items-center justify-center gap-2 px-3 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium transition-colors border border-emerald-200 hover:border-emerald-400"
                     >
-                      <ExternalLink className="w-3 h-3" />
+                      <span>{portal.icon}</span>
                       {portal.name}
                     </a>
                   ))}
@@ -1999,7 +1970,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
             <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-500">
-                  Dados obtidos via Google Custom Search API
+                  Pesquise diretamente nos portais de notícias e fontes oficiais
                 </p>
                 <button
                   onClick={() => setShowNewsModal(false)}
