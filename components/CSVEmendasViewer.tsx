@@ -406,7 +406,7 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
                           cx="50%"
                           cy="50%"
                           outerRadius={100}
-                          label={({ nome, percent }) => `${nome} (${(percent * 100).toFixed(0)}%)`}
+                          label={({ name, percent }: { name: string; percent: number }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                           labelLine={false}
                         >
                           {dadosPizza.map((entry, index) => (
