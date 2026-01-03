@@ -400,9 +400,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                 </div>
               )}
 
-              <div className="h-72 w-full mb-8">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displaySalaryData}>
+              <div className="h-72 w-full mb-8" style={{ minHeight: '288px' }}>
+                <ResponsiveContainer width="100%" height={288} minWidth={300}>
+                  <BarChart data={displaySalaryData.length > 0 ? displaySalaryData : [{ name: 'N/A', amount: 0 }]}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="name" tick={{fill: '#64748b', fontSize: 12}} tickLine={false} axisLine={false} />
                     <YAxis tickFormatter={(val) => `R$${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} tickLine={false} axisLine={false} />
@@ -562,9 +562,9 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                   </div>
                </div>
                
-               <div className="h-64 w-full">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={amendmentHistoryData}>
+               <div className="h-64 w-full" style={{ minHeight: '256px' }}>
+                 <ResponsiveContainer width="100%" height={256} minWidth={300}>
+                    <BarChart data={amendmentHistoryData.length > 0 ? amendmentHistoryData : [{ year: 'N/A', proposed: 0, executed: 0 }]}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
                       <YAxis hide />

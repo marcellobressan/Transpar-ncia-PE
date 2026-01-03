@@ -1,6 +1,9 @@
 export const API_KEY = '9133530778e9c7f8e161806b556373bd';
 export const BASE_URL = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 
+// Flag para desativar chamadas à API quando CORS falha
+let corsBlocked = false;
+
 export interface DetailedAmendmentStats {
   year: number;
   totalEmpenhado: number;
@@ -44,9 +47,42 @@ const parseBRL = (value: any): number => {
 };
 
 /**
+ * Verifica se a API está acessível (sem bloqueio CORS).
+ * Esta função tenta uma requisição simples para verificar se CORS está permitido.
+ */
+export const checkApiAccess = async (): Promise<boolean> => {
+  if (corsBlocked) return false;
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${BASE_URL}/servidores?pagina=1&quantidade=1`, {
+      method: 'HEAD',
+      headers: { 'chave-api-dados': API_KEY },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (error) {
+    console.warn('Portal da Transparência API não acessível (CORS bloqueado ou offline)');
+    corsBlocked = true;
+    return false;
+  }
+};
+
+/**
  * Busca o ID de um servidor pelo nome exato ou aproximado.
+ * Retorna null se a API não estiver acessível devido a CORS.
  */
 export const fetchServidorId = async (name: string): Promise<Servidor | null> => {
+  // Se CORS já foi bloqueado, não tenta novamente
+  if (corsBlocked) {
+    console.info('Busca no Portal da Transparência desabilitada (CORS bloqueado)');
+    return null;
+  }
+  
   try {
     const url = `${BASE_URL}/servidores?nome=${encodeURIComponent(name)}&pagina=1`;
     const response = await fetch(url, {
@@ -62,7 +98,13 @@ export const fetchServidorId = async (name: string): Promise<Servidor | null> =>
     }
     return null;
   } catch (error) {
-    console.error("Erro ao buscar servidor:", error);
+    // Se for erro de CORS/rede, marca como bloqueado para evitar requisições futuras
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      corsBlocked = true;
+      console.warn('Portal da Transparência bloqueado por CORS. Usando apenas dados locais.');
+    } else {
+      console.error("Erro ao buscar servidor:", error);
+    }
     return null;
   }
 };
@@ -71,6 +113,8 @@ export const fetchServidorId = async (name: string): Promise<Servidor | null> =>
  * Busca a remuneração de um servidor por ID e Ano.
  */
 export const fetchRemuneracaoByYear = async (servidorId: number, year: number): Promise<Remuneracao[]> => {
+  if (corsBlocked) return [];
+  
   try {
     // A API de remuneração retorna dados por mês ou ano. Vamos buscar a lista e filtrar.
     // Endpoint: /servidores/{id}/remuneracao
@@ -85,12 +129,17 @@ export const fetchRemuneracaoByYear = async (servidorId: number, year: number): 
     const data = await response.json();
     return Array.isArray(data) ? data : [];
   } catch (error) {
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      corsBlocked = true;
+    }
     console.error(`Erro ao buscar remuneração para ID ${servidorId}:`, error);
     return [];
   }
 };
 
 export const fetchAmendmentsByAuthor = async (authorName: string, year: number): Promise<DetailedAmendmentStats | null> => {
+  if (corsBlocked) return null;
+  
   try {
     let allData: any[] = [];
     let page = 1;
