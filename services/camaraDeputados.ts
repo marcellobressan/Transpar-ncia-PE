@@ -1,5 +1,50 @@
+/**
+ * Serviço de integração com a API de Dados Abertos da Câmara dos Deputados
+ * 
+ * FONTES DE DADOS:
+ * 
+ * 1. API REST v2 (Principal - Recomendada)
+ *    - URL: https://dadosabertos.camara.leg.br/api/v2
+ *    - Documentação: https://dadosabertos.camara.leg.br/swagger/api.html
+ *    - Versão: 0.4.333 (12/17/2025)
+ *    - Formatos: JSON, XML
+ *    - Limites: 15 itens padrão, máx 100 por requisição
+ * 
+ * 2. WebServices SOAP/XML (Legado)
+ *    - URL: https://www.camara.leg.br/SitCamaraWS/Deputados.asmx
+ *    - Operações: ObterDeputados, ObterDetalhesDeputado, ObterLideresBancadas
+ *    - Docs: https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos-legislativo/webservices/deputados
+ *    - Formato: XML/SOAP
+ * 
+ * 3. Dados Abertos Legislativo
+ *    - URL: https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos-legislativo
+ *    - Inclui: proposições, votações, órgãos, deputados
+ * 
+ * NOTA: Preferimos a API REST v2 por ser mais moderna e suportar JSON.
+ *       Os webservices SOAP são mantidos para compatibilidade e dados específicos.
+ */
+
+// URLs das APIs
 const BASE_URL = 'https://dadosabertos.camara.leg.br/api/v2';
+const SOAP_URL = 'https://www.camara.leg.br/SitCamaraWS/Deputados.asmx';
+
 import { SpendingRecord, AdvisorStats } from '../types';
+
+// Cache para evitar requisições repetidas
+const cache: Map<string, { data: any; timestamp: number }> = new Map();
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutos
+
+function getCached<T>(key: string): T | null {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T;
+  }
+  return null;
+}
+
+function setCache(key: string, data: any): void {
+  cache.set(key, { data, timestamp: Date.now() });
+}
 
 export interface Deputy {
   id: number;
@@ -11,6 +56,40 @@ export interface Deputy {
   idLegislatura: number;
   urlFoto: string;
   email: string;
+}
+
+export interface DeputyDetails extends Deputy {
+  nomeCivil: string;
+  cpf: string;
+  sexo: string;
+  dataNascimento: string;
+  dataFalecimento: string | null;
+  ufNascimento: string;
+  municipioNascimento: string;
+  escolaridade: string;
+  ultimoStatus: {
+    id: number;
+    nome: string;
+    siglaPartido: string;
+    uriPartido: string;
+    siglaUf: string;
+    idLegislatura: number;
+    urlFoto: string;
+    email: string;
+    data: string;
+    nomeEleitoral: string;
+    gabinete: {
+      nome: string;
+      predio: string;
+      sala: string;
+      andar: string;
+      telefone: string;
+      email: string;
+    };
+    situacao: string;
+    condicaoEleitoral: string;
+    descricaoStatus: string | null;
+  };
 }
 
 export interface Expense {
@@ -33,6 +112,36 @@ export interface Expense {
   parcela: number;
 }
 
+export interface Votacao {
+  id: string;
+  uri: string;
+  data: string;
+  dataHoraRegistro: string;
+  siglaOrgao: string;
+  uriOrgao: string;
+  proposicaoObjeto: string;
+  uriProposicaoObjeto: string;
+  descricao: string;
+  aprovacao: number;
+}
+
+export interface Frente {
+  id: number;
+  uri: string;
+  titulo: string;
+  idLegislatura: number;
+}
+
+export interface Orgao {
+  id: number;
+  uri: string;
+  sigla: string;
+  nome: string;
+  titulo: string;
+  dataInicio: string;
+  dataFim: string | null;
+}
+
 export interface FuelAnalysisResult {
   totalSpent: number;
   warnings: string[];
@@ -41,8 +150,13 @@ export interface FuelAnalysisResult {
 
 /**
  * Busca um deputado pelo nome. Retorna o primeiro resultado encontrado.
+ * Endpoint: GET /deputados
  */
 export const findDeputyByName = async (name: string): Promise<Deputy | null> => {
+  const cacheKey = `deputy_name_${name}`;
+  const cached = getCached<Deputy>(cacheKey);
+  if (cached) return cached;
+
   try {
     // Busca aproximada pelo nome
     const url = `${BASE_URL}/deputados?nome=${encodeURIComponent(name)}&ordem=ASC&ordenarPor=nome`;
@@ -54,14 +168,40 @@ export const findDeputyByName = async (name: string): Promise<Deputy | null> => 
     
     // A API retorna uma lista. Tentamos encontrar um match exato ou retornamos o primeiro
     if (data.dados && data.dados.length > 0) {
-      // Tenta filtrar por PE se possível, mas aqui retornaremos o primeiro match
-      // Idealmente, filtraríamos pela UF do candidato no app
+      setCache(cacheKey, data.dados[0]);
       return data.dados[0];
     }
     
     return null;
   } catch (error) {
     console.error("Erro na API da Câmara:", error);
+    return null;
+  }
+};
+
+/**
+ * Busca detalhes completos de um deputado pelo ID
+ * Endpoint: GET /deputados/{id}
+ */
+export const getDeputyDetails = async (id: number): Promise<DeputyDetails | null> => {
+  const cacheKey = `deputy_details_${id}`;
+  const cached = getCached<DeputyDetails>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${BASE_URL}/deputados/${id}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) throw new Error('Falha ao buscar detalhes do deputado');
+    
+    const data = await response.json();
+    if (data.dados) {
+      setCache(cacheKey, data.dados);
+      return data.dados;
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao buscar detalhes do deputado:", error);
     return null;
   }
 };
@@ -257,4 +397,383 @@ export const analyzeFuelExpenses = (expenses: Expense[]): FuelAnalysisResult => 
     warnings: warnings.slice(0, 5), // Retornar apenas os top 5 avisos para não poluir a UI
     suspiciousTransactions: uniqueSuspicious
   };
+};
+
+/**
+ * Busca votações de um deputado
+ * Endpoint: GET /deputados/{id}/votacoes
+ */
+export const getDeputyVotacoes = async (id: number, ano?: number): Promise<Votacao[]> => {
+  const cacheKey = `deputy_votacoes_${id}_${ano || 'all'}`;
+  const cached = getCached<Votacao[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    let url = `${BASE_URL}/deputados/${id}/votacoes?itens=100&ordem=DESC&ordenarPor=dataHoraRegistro`;
+    if (ano) {
+      url += `&dataInicio=${ano}-01-01&dataFim=${ano}-12-31`;
+    }
+    
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    const votacoes = data.dados || [];
+    setCache(cacheKey, votacoes);
+    return votacoes;
+  } catch (error) {
+    console.error("Erro ao buscar votações:", error);
+    return [];
+  }
+};
+
+/**
+ * Busca frentes parlamentares de um deputado
+ * Endpoint: GET /deputados/{id}/frentes
+ */
+export const getDeputyFrentes = async (id: number): Promise<Frente[]> => {
+  const cacheKey = `deputy_frentes_${id}`;
+  const cached = getCached<Frente[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${BASE_URL}/deputados/${id}/frentes`;
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    const frentes = data.dados || [];
+    setCache(cacheKey, frentes);
+    return frentes;
+  } catch (error) {
+    console.error("Erro ao buscar frentes:", error);
+    return [];
+  }
+};
+
+/**
+ * Busca órgãos (comissões) de um deputado
+ * Endpoint: GET /deputados/{id}/orgaos
+ */
+export const getDeputyOrgaos = async (id: number): Promise<Orgao[]> => {
+  const cacheKey = `deputy_orgaos_${id}`;
+  const cached = getCached<Orgao[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${BASE_URL}/deputados/${id}/orgaos`;
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    const orgaos = data.dados || [];
+    setCache(cacheKey, orgaos);
+    return orgaos;
+  } catch (error) {
+    console.error("Erro ao buscar órgãos:", error);
+    return [];
+  }
+};
+
+/**
+ * Busca todas as despesas de um deputado em múltiplos anos
+ * Útil para análise histórica
+ */
+export const getDeputyExpensesMultiYear = async (
+  id: number, 
+  years: number[] = [2024, 2023, 2022, 2021]
+): Promise<{ year: number; expenses: Expense[]; total: number }[]> => {
+  const results = await Promise.all(
+    years.map(async (year) => {
+      const expenses = await getDeputyExpenses(id, year);
+      const total = expenses.reduce((sum, exp) => sum + exp.valorLiquido, 0);
+      return { year, expenses, total };
+    })
+  );
+  
+  return results.filter(r => r.expenses.length > 0);
+};
+
+/**
+ * Calcula estatísticas gerais de um deputado
+ */
+export const getDeputyStats = async (id: number): Promise<{
+  totalDespesas: number;
+  despesasPorAno: { ano: number; total: number }[];
+  categoriasTop: { categoria: string; total: number }[];
+  votacoesCount: number;
+  frentesCount: number;
+  orgaosCount: number;
+}> => {
+  const [expensesData, votacoes, frentes, orgaos] = await Promise.all([
+    getDeputyExpensesMultiYear(id),
+    getDeputyVotacoes(id),
+    getDeputyFrentes(id),
+    getDeputyOrgaos(id),
+  ]);
+
+  // Total de despesas
+  const totalDespesas = expensesData.reduce((sum, y) => sum + y.total, 0);
+  
+  // Despesas por ano
+  const despesasPorAno = expensesData.map(({ year, total }) => ({ ano: year, total }));
+  
+  // Agregar por categoria
+  const allExpenses = expensesData.flatMap(y => y.expenses);
+  const categoryMap = new Map<string, number>();
+  allExpenses.forEach(exp => {
+    const current = categoryMap.get(exp.tipoDespesa) || 0;
+    categoryMap.set(exp.tipoDespesa, current + exp.valorLiquido);
+  });
+  
+  const categoriasTop = Array.from(categoryMap.entries())
+    .map(([categoria, total]) => ({ categoria, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  return {
+    totalDespesas,
+    despesasPorAno,
+    categoriasTop,
+    votacoesCount: votacoes.length,
+    frentesCount: frentes.length,
+    orgaosCount: orgaos.length,
+  };
+};
+
+// ============================================================================
+// WEBSERVICES SOAP/XML (LEGADO)
+// ============================================================================
+
+/**
+ * Interface para deputado retornado pelo webservice SOAP
+ */
+export interface DeputadoSOAP {
+  ideCadastro: string;
+  codOrcamento: string;
+  condicao: string;
+  matricula: string;
+  idParlamentar: string;
+  nome: string;
+  nomeParlamentar: string;
+  urlFoto: string;
+  sexo: string;
+  uf: string;
+  partido: string;
+  gabinete: string;
+  anexo: string;
+  fone: string;
+  email: string;
+  comissoes?: {
+    titular: string[];
+    suplente: string[];
+  };
+}
+
+/**
+ * Busca deputados via webservice SOAP (XML)
+ * Endpoint: https://www.camara.leg.br/SitCamaraWS/Deputados.asmx/ObterDeputados
+ * 
+ * Este endpoint retorna TODOS os deputados em exercício de uma só vez.
+ * Útil quando precisamos de dados que não estão na API REST.
+ */
+export const getDeputadosSOAP = async (): Promise<DeputadoSOAP[]> => {
+  const cacheKey = 'soap_deputados_all';
+  const cached = getCached<DeputadoSOAP[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(`${SOAP_URL}/ObterDeputados`);
+    if (!response.ok) {
+      console.warn('WebService SOAP da Câmara não acessível');
+      return [];
+    }
+
+    const xmlText = await response.text();
+    
+    // Parse simples do XML (sem dependência externa)
+    const deputados: DeputadoSOAP[] = [];
+    const deputadoMatches = xmlText.match(/<deputado>([\s\S]*?)<\/deputado>/g) || [];
+    
+    deputadoMatches.forEach(deputadoXml => {
+      const getValue = (tag: string): string => {
+        const match = deputadoXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+        return match ? match[1].trim() : '';
+      };
+
+      deputados.push({
+        ideCadastro: getValue('ideCadastro'),
+        codOrcamento: getValue('codOrcamento'),
+        condicao: getValue('condicao'),
+        matricula: getValue('matricula'),
+        idParlamentar: getValue('idParlamentar'),
+        nome: getValue('nome'),
+        nomeParlamentar: getValue('nomeParlamentar'),
+        urlFoto: getValue('urlFoto'),
+        sexo: getValue('sexo'),
+        uf: getValue('uf'),
+        partido: getValue('partido'),
+        gabinete: getValue('gabinete'),
+        anexo: getValue('anexo'),
+        fone: getValue('fone'),
+        email: getValue('email'),
+      });
+    });
+
+    if (deputados.length > 0) {
+      setCache(cacheKey, deputados);
+    }
+    
+    return deputados;
+  } catch (error) {
+    console.error('Erro ao acessar WebService SOAP:', error);
+    return [];
+  }
+};
+
+/**
+ * Busca deputados de PE via webservice SOAP
+ */
+export const getDeputadosPESOAP = async (): Promise<DeputadoSOAP[]> => {
+  const todos = await getDeputadosSOAP();
+  return todos.filter(d => d.uf === 'PE');
+};
+
+/**
+ * Busca líderes de bancadas via webservice SOAP
+ * Endpoint: https://www.camara.leg.br/SitCamaraWS/Deputados.asmx/ObterLideresBancadas
+ */
+export const getLideresBancadas = async (): Promise<{ partido: string; lider: string; nome: string }[]> => {
+  const cacheKey = 'soap_lideres_bancadas';
+  const cached = getCached<{ partido: string; lider: string; nome: string }[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(`${SOAP_URL}/ObterLideresBancadas`);
+    if (!response.ok) return [];
+
+    const xmlText = await response.text();
+    const lideres: { partido: string; lider: string; nome: string }[] = [];
+    
+    const bancadaMatches = xmlText.match(/<bancada>([\s\S]*?)<\/bancada>/g) || [];
+    
+    bancadaMatches.forEach(bancadaXml => {
+      const getValue = (tag: string): string => {
+        const match = bancadaXml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+        return match ? match[1].trim() : '';
+      };
+
+      const partido = getValue('sigla');
+      const liderMatch = bancadaXml.match(/<lider>([\s\S]*?)<\/lider>/);
+      if (liderMatch) {
+        const nome = liderMatch[1].match(/<nome>([^<]*)<\/nome>/)?.[1] || '';
+        const ideCadastro = liderMatch[1].match(/<ideCadastro>([^<]*)<\/ideCadastro>/)?.[1] || '';
+        lideres.push({ partido, lider: ideCadastro, nome });
+      }
+    });
+
+    if (lideres.length > 0) {
+      setCache(cacheKey, lideres);
+    }
+    
+    return lideres;
+  } catch (error) {
+    console.error('Erro ao buscar líderes de bancadas:', error);
+    return [];
+  }
+};
+
+// ============================================================================
+// ARQUIVOS DE DADOS ABERTOS (CSV/XML)
+// ============================================================================
+
+/**
+ * URLs para download de arquivos de dados abertos
+ * Estes arquivos contêm dados históricos completos em formato CSV/XML
+ */
+export const DADOS_ABERTOS_ARQUIVOS = {
+  // Despesas CEAP (Cota para Exercício da Atividade Parlamentar)
+  despesasCEAP: {
+    atual: 'https://www.camara.leg.br/cotas/Ano-2024.csv.zip',
+    historico: (ano: number) => `https://www.camara.leg.br/cotas/Ano-${ano}.csv.zip`,
+    descricao: 'Despesas de gabinete dos deputados por ano',
+  },
+  
+  // Presença em plenário
+  presenca: {
+    url: 'https://dadosabertos.camara.leg.br/arquivos/presenca/csv/presenca.csv',
+    descricao: 'Registro de presença dos deputados em sessões',
+  },
+  
+  // Votações
+  votacoes: {
+    url: 'https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes.csv',
+    descricao: 'Histórico de votações em plenário',
+  },
+  
+  // Deputados
+  deputados: {
+    atual: 'https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv',
+    descricao: 'Lista completa de deputados (atual e histórico)',
+  },
+};
+
+/**
+ * URLs úteis para a Câmara dos Deputados
+ */
+export const CAMARA_URLS = {
+  // API REST v2
+  api: 'https://dadosabertos.camara.leg.br/api/v2',
+  swagger: 'https://dadosabertos.camara.leg.br/swagger/api.html',
+  
+  // WebServices SOAP (Legado)
+  soapDeputados: 'https://www.camara.leg.br/SitCamaraWS/Deputados.asmx',
+  soapProposicoes: 'https://www.camara.leg.br/SitCamaraWS/Proposicoes.asmx',
+  soapOrgaos: 'https://www.camara.leg.br/SitCamaraWS/Orgaos.asmx',
+  soapSessoes: 'https://www.camara.leg.br/SitCamaraWS/SessoesReunioes.asmx',
+  
+  // Documentação WebServices
+  docsWebservices: 'https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos-legislativo/webservices',
+  docsDeputados: 'https://www2.camara.leg.br/transparencia/dados-abertos/dados-abertos-legislativo/webservices/deputados/deputados',
+  
+  // Portal
+  portal: 'https://www.camara.leg.br',
+  transparencia: 'https://www.camara.leg.br/transparencia',
+  deputados: 'https://www.camara.leg.br/deputados/quem-sao',
+  despesas: 'https://www.camara.leg.br/transparencia/gastos-parlamentares',
+  presenca: 'https://www.camara.leg.br/transparencia/frequencia-e-votacoes',
+  
+  // Funções para URLs dinâmicas
+  perfilDeputado: (id: number) => `https://www.camara.leg.br/deputados/${id}`,
+  despesasDeputado: (id: number) => `https://www.camara.leg.br/deputados/${id}/despesas`,
+  detalhesSOAP: (id: number) => `${SOAP_URL}/ObterDetalhesDeputado?ideCadastro=${id}&numLegislatura=`,
+};
+
+export default {
+  // API REST v2
+  findDeputyByName,
+  getDeputyDetails,
+  getDeputyPhotoUrl,
+  getDeputiesByState,
+  getDeputyStaff,
+  getDeputyExpenses,
+  getDeputyExpensesMultiYear,
+  getDeputyVotacoes,
+  getDeputyFrentes,
+  getDeputyOrgaos,
+  getDeputyStats,
+  
+  // WebServices SOAP
+  getDeputadosSOAP,
+  getDeputadosPESOAP,
+  getLideresBancadas,
+  
+  // Utilidades
+  aggregateExpensesByCategory,
+  getTopIndividualExpenses,
+  analyzeFuelExpenses,
+  
+  // URLs e Arquivos
+  CAMARA_URLS,
+  DADOS_ABERTOS_ARQUIVOS,
 };
