@@ -3,9 +3,9 @@ import { Politician, EfficiencyRating, AmendmentHistory, SpendingRecord, Candida
 import { FORMATTER_BRL, PARTY_LOGOS } from '../constants';
 import EfficiencyBadge from './EfficiencyBadge';
 import Tooltip from './Tooltip';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
-import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2 } from 'lucide-react';
-import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao } from '../services/portalTransparencia';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
+import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins } from 'lucide-react';
+import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
 import { getLinksConsulta, getResumoFontes, LinkConsulta, PORTAIS_PE } from '../services/transparenciaPE';
@@ -36,6 +36,11 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const [isLoadingRealData, setIsLoadingRealData] = useState(false);
   const [realDataError, setRealDataError] = useState<string | null>(null);
   const [realAmendmentStats, setRealAmendmentStats] = useState<RealAmendmentData | null>(null);
+
+  // Estado para novo sistema de emendas detalhado
+  const [isLoadingEmendas, setIsLoadingEmendas] = useState(false);
+  const [emendasError, setEmendasError] = useState<string | null>(null);
+  const [resumoEmendas, setResumoEmendas] = useState<ResumoEmendasAutor | null>(null);
 
   const [isSyncingSalary, setIsSyncingSalary] = useState(false);
   const [salaryError, setSalaryError] = useState<string | null>(null);
@@ -300,6 +305,7 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
     }
   };
 
+  // Handler original (mantido para compatibilidade)
   const handleFetchRealData = async () => {
     setIsLoadingRealData(true);
     setRealDataError(null);
@@ -338,6 +344,40 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
       setRealDataError("Erro de conexão com o Portal.");
     } finally {
       setIsLoadingRealData(false);
+    }
+  };
+
+  // NOVO: Handler para buscar emendas detalhadas
+  const handleFetchEmendasDetalhadas = async () => {
+    setIsLoadingEmendas(true);
+    setEmendasError(null);
+    setResumoEmendas(null);
+    
+    try {
+      const resumo = await fetchResumoEmendasAutor(politician.name, [2024, 2023, 2022, 2021, 2020]);
+      
+      if (!resumo) {
+        setEmendasError("Nenhuma emenda encontrada para este parlamentar no Portal da Transparência.");
+        return;
+      }
+      
+      setResumoEmendas(resumo);
+      
+      // Também atualiza o estado antigo para compatibilidade com o gráfico
+      if (resumo.historicoAnual.length > 0) {
+        setRealAmendmentStats({
+          totalProposed: resumo.valorTotalEmpenhado,
+          totalExecuted: resumo.valorTotalPago,
+          topAreas: resumo.porFuncao.slice(0, 3).map(f => f.funcao),
+          geoDistribution: resumo.porLocalidade.slice(0, 3).map(l => l.localidade),
+          history: resumo.historicoAnual.map(h => ({ year: h.ano, proposed: h.empenhado, executed: h.pago }))
+        });
+      }
+    } catch (error: any) {
+      setEmendasError("Erro ao consultar emendas no Portal da Transparência.");
+      console.error('Erro ao buscar emendas:', error);
+    } finally {
+      setIsLoadingEmendas(false);
     }
   };
 
@@ -796,22 +836,39 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
             </div>
           )}
 
-           {/* EMENDAS SECTION */}
+           {/* EMENDAS SECTION - VERSÃO EXPANDIDA */}
            {(activeFilter === 'TODOS' || activeFilter === 'EMENDAS') && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-               <div className="flex justify-between items-center mb-6">
+               <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                  <div>
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <Globe className="w-5 h-5 text-brand-500" />
+                      <Landmark className="w-5 h-5 text-brand-500" />
                       {typeConfig.emendasTitulo}
                     </h3>
                     <p className="text-sm text-slate-500">{typeConfig.emendasDescricao}</p>
                  </div>
                  {typeConfig.temEmendas && politician.sphere === 'Federal' && (
-                   <button onClick={handleFetchRealData} disabled={isLoadingRealData} className="text-xs px-3 py-1.5 bg-slate-800 text-white rounded-lg font-bold flex items-center gap-2">
-                      {isLoadingRealData ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Globe className="w-3 h-3"/>}
-                      Buscar Portal
-                   </button>
+                   <div className="flex items-center gap-2">
+                     <button 
+                       onClick={handleFetchEmendasDetalhadas} 
+                       disabled={isLoadingEmendas} 
+                       className={`text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-2 transition ${
+                         resumoEmendas ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-600 text-white hover:bg-brand-700'
+                       }`}
+                     >
+                        {isLoadingEmendas ? <RefreshCw className="w-3 h-3 animate-spin"/> : resumoEmendas ? <CheckCircle className="w-3 h-3"/> : <Database className="w-3 h-3"/>}
+                        {isLoadingEmendas ? 'Buscando...' : resumoEmendas ? 'Atualizado' : 'Buscar Emendas'}
+                     </button>
+                     <a 
+                       href={getUrlConsultaEmendas(politician.name)} 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-2 transition"
+                     >
+                       <ExternalLink className="w-3 h-3" />
+                       Ver no Portal
+                     </a>
+                   </div>
                  )}
                  {!typeConfig.temEmendas && (
                    <a 
@@ -851,34 +908,195 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                  </div>
                )}
 
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 flex flex-col justify-center items-center text-center">
-                    <span className="text-3xl font-black text-brand-600">
-                      {displayAmendments.totalProposed > 0 ? Math.round((displayAmendments.totalExecuted / displayAmendments.totalProposed) * 100) : 0}%
-                    </span>
-                    <span className="text-xs font-bold text-brand-800 uppercase tracking-wide mt-1">Execução Financeira</span>
-                  </div>
-                  <div className="md:col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                     <p className="text-xs font-bold text-slate-400 uppercase mb-3">Principais Destinos</p>
-                     <div className="flex flex-wrap gap-2">
-                        {displayAmendments.topAreas.map((area, i) => (
-                          <span key={i} className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 shadow-sm">{area}</span>
-                        ))}
+               {/* Erro ao buscar */}
+               {emendasError && (
+                 <div className="mb-6 bg-amber-50 border border-amber-100 text-amber-800 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                   <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" />
+                   <div>
+                     <p className="font-semibold">{emendasError}</p>
+                     <a 
+                       href={getUrlConsultaEmendas(politician.name)} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="inline-flex items-center gap-1 mt-2 text-amber-700 hover:text-amber-900 font-semibold"
+                     >
+                       Consultar manualmente no Portal <ExternalLink className="w-3 h-3" />
+                     </a>
+                   </div>
+                 </div>
+               )}
+
+               {/* RESUMO DETALHADO DE EMENDAS */}
+               {resumoEmendas && (
+                 <>
+                   {/* Alertas */}
+                   {resumoEmendas.alertas.length > 0 && (
+                     <div className="mb-6 bg-amber-50 border border-amber-100 rounded-2xl p-5">
+                       <h4 className="text-amber-900 font-bold text-sm flex items-center gap-2 mb-3">
+                         <AlertTriangle className="w-4 h-4" />
+                         Pontos de Atenção
+                       </h4>
+                       <ul className="space-y-2">
+                         {resumoEmendas.alertas.map((alerta, i) => (
+                           <li key={i} className="text-xs text-amber-800 flex items-start gap-2 bg-white/50 p-2 rounded-lg">
+                             <span className="mt-1 min-w-[6px] h-[6px] bg-amber-500 rounded-full"></span>
+                             {alerta}
+                           </li>
+                         ))}
+                       </ul>
                      </div>
-                  </div>
-               </div>
-               
-               <div className="h-64 w-full" style={{ minHeight: '256px' }}>
-                 <ResponsiveContainer width="100%" height={256} minWidth={300}>
-                    <BarChart data={amendmentHistoryData.length > 0 ? amendmentHistoryData : [{ year: 'N/A', proposed: 0, executed: 0 }]}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                      <YAxis hide />
+                   )}
+
+                   {/* Cards de Resumo */}
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                     <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 text-center">
+                       <Coins className="w-5 h-5 text-brand-600 mx-auto mb-2" />
+                       <span className="text-2xl font-black text-brand-700">{resumoEmendas.totalEmendas}</span>
+                       <p className="text-xs font-medium text-brand-600 mt-1">Emendas</p>
+                     </div>
+                     <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
+                       <TrendingUp className="w-5 h-5 text-emerald-600 mx-auto mb-2" />
+                       <span className="text-2xl font-black text-emerald-700">{formatarValorEmenda(resumoEmendas.valorTotalEmpenhado)}</span>
+                       <p className="text-xs font-medium text-emerald-600 mt-1">Empenhado</p>
+                     </div>
+                     <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-center">
+                       <CheckCircle className="w-5 h-5 text-blue-600 mx-auto mb-2" />
+                       <span className="text-2xl font-black text-blue-700">{formatarValorEmenda(resumoEmendas.valorTotalPago)}</span>
+                       <p className="text-xs font-medium text-blue-600 mt-1">Pago</p>
+                     </div>
+                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+                       <BarChart2 className="w-5 h-5 text-slate-600 mx-auto mb-2" />
+                       <span className={`text-2xl font-black ${resumoEmendas.percentualExecucao > 70 ? 'text-emerald-600' : resumoEmendas.percentualExecucao > 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                         {resumoEmendas.percentualExecucao}%
+                       </span>
+                       <p className="text-xs font-medium text-slate-500 mt-1">Execução</p>
+                     </div>
+                   </div>
+
+                   {/* Por Tipo de Emenda */}
+                   <div className="mb-6 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                     <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                       <PieChartIcon className="w-4 h-4 text-brand-500" />
+                       Distribuição por Tipo
+                     </h4>
+                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                       {[
+                         { label: 'Individual', valor: resumoEmendas.porTipo.individual, cor: 'bg-brand-100 text-brand-700 border-brand-200' },
+                         { label: 'Bancada', valor: resumoEmendas.porTipo.bancada, cor: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+                         { label: 'Comissão', valor: resumoEmendas.porTipo.comissao, cor: 'bg-blue-100 text-blue-700 border-blue-200' },
+                         { label: 'Relator', valor: resumoEmendas.porTipo.relator, cor: 'bg-amber-100 text-amber-700 border-amber-200' },
+                         { label: 'Transf. Esp.', valor: resumoEmendas.porTipo.transferenciasEspeciais, cor: 'bg-purple-100 text-purple-700 border-purple-200' },
+                       ].filter(t => t.valor > 0).map((tipo, i) => (
+                         <div key={i} className={`p-3 rounded-xl border ${tipo.cor} text-center`}>
+                           <p className="text-lg font-bold">{formatarValorEmenda(tipo.valor)}</p>
+                           <p className="text-xs font-medium mt-1">{tipo.label}</p>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+
+                   {/* Top Funções/Áreas */}
+                   {resumoEmendas.porFuncao.length > 0 && (
+                     <div className="mb-6">
+                       <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                         <Building2 className="w-4 h-4 text-brand-500" />
+                         Principais Áreas (Funções)
+                       </h4>
+                       <div className="overflow-hidden border border-slate-100 rounded-xl">
+                         <table className="min-w-full text-sm">
+                           <thead className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase">
+                             <tr>
+                               <th className="px-4 py-3 text-left">Função</th>
+                               <th className="px-4 py-3 text-right">Empenhado</th>
+                               <th className="px-4 py-3 text-right">Pago</th>
+                               <th className="px-4 py-3 text-center">Qtd.</th>
+                             </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-100 bg-white">
+                             {resumoEmendas.porFuncao.slice(0, 5).map((funcao, i) => (
+                               <tr key={i} className="hover:bg-slate-50">
+                                 <td className="px-4 py-3 font-medium text-slate-700">{funcao.funcao}</td>
+                                 <td className="px-4 py-3 text-right text-slate-600">{FORMATTER_BRL.format(funcao.valorEmpenhado)}</td>
+                                 <td className="px-4 py-3 text-right text-slate-600">{FORMATTER_BRL.format(funcao.valorPago)}</td>
+                                 <td className="px-4 py-3 text-center">
+                                   <span className="px-2 py-0.5 bg-slate-100 rounded-full text-xs font-medium">{funcao.quantidade}</span>
+                                 </td>
+                               </tr>
+                             ))}
+                           </tbody>
+                         </table>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Distribuição Geográfica */}
+                   {resumoEmendas.porLocalidade.length > 0 && (
+                     <div className="mb-6">
+                       <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                         <MapPinned className="w-4 h-4 text-brand-500" />
+                         Distribuição Geográfica
+                       </h4>
+                       <div className="flex flex-wrap gap-2">
+                         {resumoEmendas.porLocalidade.slice(0, 10).map((loc, i) => (
+                           <div 
+                             key={i} 
+                             className={`px-3 py-2 rounded-xl border text-xs font-medium ${
+                               loc.isPernambuco || loc.isRecife 
+                                 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                                 : 'bg-white border-slate-200 text-slate-600'
+                             }`}
+                           >
+                             <span className="font-bold">{loc.localidade}</span>
+                             <span className="ml-2 opacity-75">{formatarValorEmenda(loc.valorTotal)}</span>
+                             {(loc.isPernambuco || loc.isRecife) && (
+                               <span className="ml-1">🏠</span>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+                 </>
+               )}
+
+               {/* DADOS SIMPLIFICADOS (quando não há dados detalhados) */}
+               {!resumoEmendas && (
+                 <>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                      <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 flex flex-col justify-center items-center text-center">
+                        <span className="text-3xl font-black text-brand-600">
+                          {displayAmendments.totalProposed > 0 ? Math.round((displayAmendments.totalExecuted / displayAmendments.totalProposed) * 100) : 0}%
+                        </span>
+                        <span className="text-xs font-bold text-brand-800 uppercase tracking-wide mt-1">Execução Financeira</span>
+                      </div>
+                      <div className="md:col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                         <p className="text-xs font-bold text-slate-400 uppercase mb-3">Principais Destinos</p>
+                         <div className="flex flex-wrap gap-2">
+                            {displayAmendments.topAreas.map((area, i) => (
+                              <span key={i} className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 shadow-sm">{area}</span>
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+                 </>
+               )}
+
+               {/* Gráfico de Histórico */}
+               <div className="mt-6">
+                 <h4 className="text-sm font-bold text-slate-700 mb-3">Evolução Anual</h4>
+                 <div className="h-64 w-full" style={{ minHeight: '256px' }}>
+                   <ResponsiveContainer width="100%" height={256} minWidth={300}>
+                      <BarChart data={amendmentHistoryData.length > 0 ? amendmentHistoryData : [{ year: 'N/A', proposed: 0, executed: 0 }]}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                        <YAxis hide />
                       <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                      <Legend />
                       <Bar dataKey="proposed" name="Empenhado" fill="#cbd5e1" radius={[4,4,0,0]} barSize={20} />
                       <Bar dataKey="executed" name="Pago" fill="#0ea5e9" radius={[4,4,0,0]} barSize={20} />
                     </BarChart>
-                 </ResponsiveContainer>
+                   </ResponsiveContainer>
+                 </div>
                </div>
             </div>
            )}
