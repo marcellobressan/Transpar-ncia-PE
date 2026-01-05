@@ -1,4 +1,6 @@
-export const GOOGLE_API_KEY = 'AIzaSyANdicbf8a-5qEgZnIn50aGp6CoYTUkIIw'; // Chave fornecida
+// Chave da API do Google para Fact Check Tools
+// Configurar via variável de ambiente VITE_GOOGLE_API_KEY
+export const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const BASE_URL = 'https://factchecktools.googleapis.com/v1alpha1/claims:search';
 
 export interface FactCheckReview {

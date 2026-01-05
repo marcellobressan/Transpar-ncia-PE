@@ -3,10 +3,12 @@
  * Usa a API de busca do Google Custom Search para encontrar notícias relevantes
  */
 
-export const GOOGLE_API_KEY = 'AIzaSyANdicbf8a-5qEgZnIn50aGp6CoYTUkIIw';
+// Chave da API do Google para Custom Search
+// Configurar via variável de ambiente VITE_GOOGLE_API_KEY
+export const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 // Search Engine ID para buscas web gerais (criado no Google Custom Search)
 // Para produção, criar um CSE específico em: https://programmablesearchengine.google.com/
-const GOOGLE_CSE_ID = '017576662512468239146:omuauf_gy2o'; // CSE público de exemplo
+const GOOGLE_CSE_ID = import.meta.env.VITE_GOOGLE_CSE_ID || '017576662512468239146:omuauf_gy2o';
 
 export interface NewsResult {
   title: string;
