@@ -4,7 +4,11 @@ export const BASE_URL = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 // URLs de download direto de dados do Portal da Transparência
 // https://portaldatransparencia.gov.br/download-de-dados
 export const DOWNLOAD_URLS = {
-  // Emendas parlamentares - arquivos CSV por ano
+  // Emendas parlamentares - arquivo ÚNICO com todos os dados (ZIP com 3 planilhas)
+  // Contém: 1) Emendas, 2) Beneficiários, 3) Pagamentos
+  emendasParlamentaresUnico: 'https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares/UNICO',
+  
+  // Emendas parlamentares - arquivos CSV por ano (legado)
   emendas: (ano: number) => `https://portaldatransparencia.gov.br/download-de-dados/emendas/${ano}`,
   
   // Despesas de execução - contém detalhes de pagamentos

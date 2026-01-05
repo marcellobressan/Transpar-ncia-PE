@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { AlertTriangle, CheckCircle, Info, FileText, Search, RefreshCw, Globe, Database, Building2, Filter, ExternalLink, FileSearch, CheckSquare, XCircle, HelpCircle, Briefcase, MapPin, UserCheck, UserX, Fuel, BarChart2, Users, AlertOctagon, Siren, ShieldAlert, Calendar, ChevronLeft, Download, Link2, PieChart as PieChartIcon, TrendingUp, MapPinned, Landmark, Coins, FileDown, FileJson, Code, Upload, Newspaper, BookOpen, Scale, X } from 'lucide-react';
 import { fetchAmendmentsByAuthor, DetailedAmendmentStats, fetchServidorId, fetchRemuneracaoByYear, Remuneracao, fetchResumoEmendasAutor, ResumoEmendasAutor, getUrlConsultaEmendas, formatarValorEmenda, getUrlsAnalise, PORTAL_URLS, DOWNLOAD_URLS } from '../services/portalTransparencia';
 import { findDeputyByName, getDeputyExpenses, aggregateExpensesByCategory, getTopIndividualExpenses, analyzeFuelExpenses, FuelAnalysisResult, getDeputyStaff } from '../services/camaraDeputados';
+import { analisarCEAPComparativo, AnaliseComparativaCEAP, LIMITES_CEAP } from '../services/analiseCEAP';
 import { searchFactChecks, FactCheckClaim } from '../services/factCheck';
 import { getLinksConsulta, getResumoFontes, LinkConsulta, PORTAIS_PE } from '../services/transparenciaPE';
 import { getNewsSearchUrls, getOfficialSearchUrls, buildAlertSearchQuery, NewsResult, searchNews } from '../services/newsSearch';
@@ -59,6 +60,11 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
   const [fuelAnalysis, setFuelAnalysis] = useState<FuelAnalysisResult | null>(null);
   const [advisorStatsOverride, setAdvisorStatsOverride] = useState<AdvisorStats | null>(null);
   const [deputyPhotoOverride, setDeputyPhotoOverride] = useState<string | null>(null);
+  
+  // Estado para análise comparativa CEAP
+  const [isLoadingCeapAnalysis, setIsLoadingCeapAnalysis] = useState(false);
+  const [ceapAnalysis, setCeapAnalysis] = useState<AnaliseComparativaCEAP | null>(null);
+  const [ceapAnalysisError, setCeapAnalysisError] = useState<string | null>(null);
 
   const [isLoadingFactCheck, setIsLoadingFactCheck] = useState(false);
   const [factCheckError, setFactCheckError] = useState<string | null>(null);
@@ -399,6 +405,8 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
     setCamaraError(null);
     setFuelAnalysis(null);
     setAdvisorStatsOverride(null);
+    setCeapAnalysis(null);
+    setCeapAnalysisError(null);
     try {
       const deputy = await findDeputyByName(politician.name);
       if (!deputy) {
@@ -407,11 +415,37 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
         return;
       }
       if (deputy.urlFoto) { setDeputyPhotoOverride(deputy.urlFoto); }
-      const expensesPromise = getDeputyExpenses(deputy.id, 2023);
+      const expensesPromise = getDeputyExpenses(deputy.id, 2024);
       const staffPromise = getDeputyStaff(deputy.id);
       const [expenses, staff] = await Promise.all([expensesPromise, staffPromise]);
       if (expenses.length === 0) {
-        setCamaraError("Nenhuma despesa encontrada para o ano de referência (2023).");
+        // Tenta 2023 se não houver dados de 2024
+        const expenses2023 = await getDeputyExpenses(deputy.id, 2023);
+        if (expenses2023.length === 0) {
+          setCamaraError("Nenhuma despesa encontrada para os anos de referência (2024/2023).");
+        } else {
+          const aggregated = aggregateExpensesByCategory(expenses2023);
+          const topExpenses = getTopIndividualExpenses(expenses2023);
+          const fuelStats = analyzeFuelExpenses(expenses2023);
+          setCeapDataOverride(aggregated.slice(0, 5)); 
+          setCeapTopExpenses(topExpenses);
+          setFuelAnalysis(fuelStats);
+          setAdvisorStatsOverride(staff);
+          
+          // Busca análise comparativa
+          try {
+            const analise = await analisarCEAPComparativo(
+              deputy.id, 
+              deputy.nome, 
+              deputy.siglaPartido, 
+              deputy.siglaUf,
+              2023
+            );
+            setCeapAnalysis(analise);
+          } catch (e) {
+            setCeapAnalysisError("Não foi possível gerar a análise comparativa.");
+          }
+        }
       } else {
         const aggregated = aggregateExpensesByCategory(expenses);
         const topExpenses = getTopIndividualExpenses(expenses);
@@ -420,6 +454,20 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
         setCeapTopExpenses(topExpenses);
         setFuelAnalysis(fuelStats);
         setAdvisorStatsOverride(staff);
+        
+        // Busca análise comparativa
+        try {
+          const analise = await analisarCEAPComparativo(
+            deputy.id, 
+            deputy.nome, 
+            deputy.siglaPartido, 
+            deputy.siglaUf,
+            2024
+          );
+          setCeapAnalysis(analise);
+        } catch (e) {
+          setCeapAnalysisError("Não foi possível gerar a análise comparativa.");
+        }
       }
     } catch (e) {
       setCamaraError("Erro ao comunicar com a API da Câmara.");
@@ -896,6 +944,235 @@ const DetailView: React.FC<DetailViewProps> = ({ candidate: politician, onBack }
                        </li>
                      ))}
                    </ul>
+                 </div>
+               )}
+
+               {/* DIAGNÓSTICO CEAP - Análise Comparativa */}
+               {ceapAnalysis && (
+                 <div className={`mb-6 rounded-2xl border-2 overflow-hidden ${
+                   ceapAnalysis.diagnostico.classificacao === 'EXEMPLAR' ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-emerald-100' :
+                   ceapAnalysis.diagnostico.classificacao === 'ECONOMICO' ? 'border-green-300 bg-gradient-to-br from-green-50 to-green-100' :
+                   ceapAnalysis.diagnostico.classificacao === 'MODERADO' ? 'border-amber-300 bg-gradient-to-br from-amber-50 to-amber-100' :
+                   ceapAnalysis.diagnostico.classificacao === 'ELEVADO' ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100' :
+                   'border-red-300 bg-gradient-to-br from-red-50 to-red-100'
+                 }`}>
+                   {/* Header do diagnóstico */}
+                   <div className={`px-5 py-4 flex items-center justify-between ${
+                     ceapAnalysis.diagnostico.classificacao === 'EXEMPLAR' ? 'bg-emerald-100' :
+                     ceapAnalysis.diagnostico.classificacao === 'ECONOMICO' ? 'bg-green-100' :
+                     ceapAnalysis.diagnostico.classificacao === 'MODERADO' ? 'bg-amber-100' :
+                     ceapAnalysis.diagnostico.classificacao === 'ELEVADO' ? 'bg-orange-100' :
+                     'bg-red-100'
+                   }`}>
+                     <div className="flex items-center gap-3">
+                       <span className="text-2xl">{ceapAnalysis.diagnostico.icone}</span>
+                       <div>
+                         <h4 className="font-bold text-slate-900">{ceapAnalysis.diagnostico.titulo}</h4>
+                         <p className="text-xs text-slate-600">Período: {ceapAnalysis.periodo.mesInicio} a {ceapAnalysis.periodo.mesFim}</p>
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <p className="text-xs text-slate-500">Utilização da Cota</p>
+                       <p className={`text-xl font-black ${
+                         ceapAnalysis.percentualUtilizado <= 50 ? 'text-emerald-700' :
+                         ceapAnalysis.percentualUtilizado <= 70 ? 'text-green-700' :
+                         ceapAnalysis.percentualUtilizado <= 85 ? 'text-amber-700' :
+                         ceapAnalysis.percentualUtilizado <= 95 ? 'text-orange-700' :
+                         'text-red-700'
+                       }`}>
+                         {ceapAnalysis.percentualUtilizado.toFixed(0)}%
+                       </p>
+                     </div>
+                   </div>
+
+                   <div className="p-5 space-y-5">
+                     {/* Descrição do diagnóstico */}
+                     <p className="text-sm text-slate-700 leading-relaxed">{ceapAnalysis.diagnostico.descricao}</p>
+
+                     {/* Cards de comparação */}
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                       <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
+                         <p className="text-xs text-slate-500 mb-1">Gasto Anual</p>
+                         <p className="font-bold text-slate-900 text-lg">{FORMATTER_BRL.format(ceapAnalysis.gastosAnual)}</p>
+                       </div>
+                       <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
+                         <p className="text-xs text-slate-500 mb-1">Média Mensal</p>
+                         <p className="font-bold text-slate-900 text-lg">{FORMATTER_BRL.format(ceapAnalysis.gastosMensal)}</p>
+                       </div>
+                       <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
+                         <p className="text-xs text-slate-500 mb-1">Limite Mensal (PE)</p>
+                         <p className="font-bold text-slate-700">{FORMATTER_BRL.format(ceapAnalysis.limiteMensal)}</p>
+                       </div>
+                       <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
+                         <p className="text-xs text-slate-500 mb-1">Limite Anual</p>
+                         <p className="font-bold text-slate-700">{FORMATTER_BRL.format(ceapAnalysis.limiteAnual)}</p>
+                       </div>
+                     </div>
+
+                     {/* Comparação com Média */}
+                     <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
+                       <h5 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                         <BarChart2 className="w-4 h-4 text-blue-500" />
+                         Comparativo com Média
+                       </h5>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                           <div>
+                             <p className="text-xs text-slate-500">Vs. Deputados de PE</p>
+                             <p className="font-medium text-slate-700">Média: {FORMATTER_BRL.format(ceapAnalysis.mediaDeputadosPE)}</p>
+                           </div>
+                           <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                             ceapAnalysis.percentualAcimaMediaPE < -10 ? 'bg-emerald-100 text-emerald-700' :
+                             ceapAnalysis.percentualAcimaMediaPE < 10 ? 'bg-slate-100 text-slate-700' :
+                             ceapAnalysis.percentualAcimaMediaPE < 30 ? 'bg-amber-100 text-amber-700' :
+                             'bg-red-100 text-red-700'
+                           }`}>
+                             {ceapAnalysis.percentualAcimaMediaPE > 0 ? '+' : ''}{ceapAnalysis.percentualAcimaMediaPE.toFixed(0)}%
+                           </span>
+                         </div>
+                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                           <div>
+                             <p className="text-xs text-slate-500">Ranking PE</p>
+                             <p className="font-medium text-slate-700">{ceapAnalysis.posicaoRankingPE}º de {ceapAnalysis.totalDeputadosPE}</p>
+                           </div>
+                           <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                             ceapAnalysis.posicaoRankingPE <= 5 ? 'bg-red-100 text-red-700' :
+                             ceapAnalysis.posicaoRankingPE <= 10 ? 'bg-orange-100 text-orange-700' :
+                             ceapAnalysis.posicaoRankingPE <= 15 ? 'bg-amber-100 text-amber-700' :
+                             'bg-emerald-100 text-emerald-700'
+                           }`}>
+                             {ceapAnalysis.posicaoRankingPE <= 5 ? 'Alto' :
+                              ceapAnalysis.posicaoRankingPE <= 10 ? 'Elevado' :
+                              ceapAnalysis.posicaoRankingPE <= 15 ? 'Médio' :
+                              'Baixo'
+                             }
+                           </span>
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* Alertas específicos */}
+                     {ceapAnalysis.alertas.length > 0 && (
+                       <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
+                         <h5 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                           <AlertTriangle className="w-4 h-4 text-amber-500" />
+                           Pontos de Atenção
+                         </h5>
+                         <div className="space-y-2">
+                           {ceapAnalysis.alertas.map((alerta, i) => (
+                             <div key={i} className={`p-3 rounded-lg text-sm flex items-start gap-3 ${
+                               alerta.severidade === 'alta' ? 'bg-red-50 border border-red-200' :
+                               alerta.severidade === 'media' ? 'bg-amber-50 border border-amber-200' :
+                               'bg-slate-50 border border-slate-200'
+                             }`}>
+                               <span className={`mt-0.5 min-w-[8px] h-[8px] rounded-full ${
+                                 alerta.severidade === 'alta' ? 'bg-red-500' :
+                                 alerta.severidade === 'media' ? 'bg-amber-500' :
+                                 'bg-slate-400'
+                               }`}></span>
+                               <div>
+                                 <p className="font-semibold text-slate-800">{alerta.titulo}</p>
+                                 <p className="text-xs text-slate-600 mt-0.5">{alerta.descricao}</p>
+                                 {alerta.valor && (
+                                   <p className="text-xs font-medium text-slate-500 mt-1">
+                                     Valor: {FORMATTER_BRL.format(alerta.valor)}
+                                   </p>
+                                 )}
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+
+                     {/* Pontos favoráveis e recomendações */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {ceapAnalysis.diagnostico.pontosFavoraveis.length > 0 && (
+                         <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-200">
+                           <h5 className="font-bold text-emerald-800 text-sm mb-2 flex items-center gap-2">
+                             <CheckCircle className="w-4 h-4" />
+                             Pontos Favoráveis
+                           </h5>
+                           <ul className="space-y-1">
+                             {ceapAnalysis.diagnostico.pontosFavoraveis.map((ponto, i) => (
+                               <li key={i} className="text-xs text-emerald-700 flex items-start gap-2">
+                                 <span className="mt-1.5 min-w-[4px] h-[4px] rounded-full bg-emerald-500"></span>
+                                 {ponto}
+                               </li>
+                             ))}
+                           </ul>
+                         </div>
+                       )}
+                       {ceapAnalysis.diagnostico.recomendacoes.length > 0 && (
+                         <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-200">
+                           <h5 className="font-bold text-blue-800 text-sm mb-2 flex items-center gap-2">
+                             <Info className="w-4 h-4" />
+                             Recomendações
+                           </h5>
+                           <ul className="space-y-1">
+                             {ceapAnalysis.diagnostico.recomendacoes.map((rec, i) => (
+                               <li key={i} className="text-xs text-blue-700 flex items-start gap-2">
+                                 <span className="mt-1.5 min-w-[4px] h-[4px] rounded-full bg-blue-500"></span>
+                                 {rec}
+                               </li>
+                             ))}
+                           </ul>
+                         </div>
+                       )}
+                     </div>
+
+                     {/* Gastos por categoria */}
+                     {ceapAnalysis.gastosPorCategoria.length > 0 && (
+                       <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
+                         <h5 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+                           <PieChartIcon className="w-4 h-4 text-indigo-500" />
+                           Distribuição por Categoria
+                         </h5>
+                         <div className="space-y-2">
+                           {ceapAnalysis.gastosPorCategoria.slice(0, 6).map((cat, i) => (
+                             <div key={i} className="flex items-center gap-3">
+                               <div className="flex-1">
+                                 <div className="flex justify-between text-xs mb-1">
+                                   <span className="text-slate-600 truncate max-w-[200px]" title={cat.categoria}>
+                                     {cat.categoria.length > 30 ? cat.categoria.substring(0, 30) + '...' : cat.categoria}
+                                   </span>
+                                   <span className="font-medium text-slate-700">{cat.percentual.toFixed(1)}%</span>
+                                 </div>
+                                 <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                   <div 
+                                     className={`h-full rounded-full ${
+                                       cat.percentual > 25 ? 'bg-red-500' :
+                                       cat.percentual > 15 ? 'bg-amber-500' :
+                                       'bg-blue-500'
+                                     }`}
+                                     style={{ width: `${Math.min(cat.percentual, 100)}%` }}
+                                   ></div>
+                                 </div>
+                               </div>
+                               <span className="text-xs font-bold text-slate-600 min-w-[80px] text-right">
+                                 {FORMATTER_BRL.format(cat.valor)}
+                               </span>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
+
+               {/* Mensagem se não houver análise ainda */}
+               {!ceapAnalysis && !isSyncingCamara && ceapDataOverride && (
+                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 flex items-center gap-3">
+                   <Info className="w-5 h-5 text-blue-500" />
+                   <span>Clique em "Baixar Dados" novamente para gerar análise comparativa completa.</span>
+                 </div>
+               )}
+
+               {ceapAnalysisError && (
+                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-3">
+                   <AlertTriangle className="w-5 h-5 text-amber-500" />
+                   <span>{ceapAnalysisError}</span>
                  </div>
                )}
 

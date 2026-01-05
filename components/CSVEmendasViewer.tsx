@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import type { PieLabelRenderProps } from 'recharts';
-import { Upload, FileText, AlertTriangle, CheckCircle, Download, Filter, Search, X, Database, BarChart2, PieChart as PieChartIcon, Table, RefreshCw, FileDown, Info, MapPin } from 'lucide-react';
+import { Upload, FileText, AlertTriangle, CheckCircle, Download, Filter, Search, X, Database, BarChart2, PieChart as PieChartIcon, Table, RefreshCw, FileDown, Info, MapPin, FileArchive, Users } from 'lucide-react';
 import { 
   processarCSVEmendas, 
   ResultadoProcessamentoCSV, 
@@ -12,6 +12,13 @@ import {
   ResumoAutor
 } from '../services/csvParser';
 import { DOWNLOAD_URLS, formatarValorEmenda } from '../services/portalTransparencia';
+import { 
+  processarArquivoZIPEmendas, 
+  ResultadoProcessamentoEmendasZIP,
+  BeneficiarioEmenda,
+  gerarResumoBeneficiarios,
+  EMENDAS_DOWNLOAD_URL
+} from '../services/emendasParlamentares';
 import { FORMATTER_BRL } from '../constants';
 
 interface CSVEmendasViewerProps {
@@ -26,19 +33,24 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [processando, setProcessando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessamentoCSV | null>(null);
+  const [resultadoZIP, setResultadoZIP] = useState<ResultadoProcessamentoEmendasZIP | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [filtroAutor, setFiltroAutor] = useState(nomeAutorPadrao);
   const [filtroAno, setFiltroAno] = useState<number | undefined>();
   const [filtroUF, setFiltroUF] = useState('PE');
-  const [visualizacao, setVisualizacao] = useState<'resumo' | 'funcoes' | 'localidades' | 'tabela'>('resumo');
+  const [visualizacao, setVisualizacao] = useState<'resumo' | 'funcoes' | 'localidades' | 'tabela' | 'beneficiarios'>('resumo');
+  const [tipoArquivo, setTipoArquivo] = useState<'csv' | 'zip' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleArquivoSelecionado = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setErro('Por favor, selecione um arquivo CSV.');
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+    const isZIP = file.name.toLowerCase().endsWith('.zip');
+
+    if (!isCSV && !isZIP) {
+      setErro('Por favor, selecione um arquivo CSV ou ZIP do Portal da Transparência.');
       return;
     }
 
@@ -46,23 +58,43 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
     setProcessando(true);
     setErro(null);
     setResultado(null);
+    setResultadoZIP(null);
+    setTipoArquivo(isZIP ? 'zip' : 'csv');
 
     try {
-      const conteudo = await file.text();
-      
-      const resultado = processarCSVEmendas(conteudo, {
-        nomeAutor: filtroAutor || undefined,
-        ano: filtroAno,
-        uf: filtroUF || undefined,
-      });
-
-      if (resultado.erros.length > 0 && resultado.emendas.length === 0) {
-        setErro(resultado.erros.join('. '));
+      if (isZIP) {
+        // Processar arquivo ZIP
+        const arrayBuffer = await file.arrayBuffer();
+        const resultadoZip = await processarArquivoZIPEmendas(arrayBuffer, {
+          nomeAutor: filtroAutor || undefined,
+          ano: filtroAno,
+          uf: filtroUF || undefined,
+        });
+        
+        if (resultadoZip.erros.length > 0 && !resultadoZip.emendas && resultadoZip.beneficiarios.length === 0) {
+          setErro(resultadoZip.erros.join('. '));
+        } else {
+          setResultadoZIP(resultadoZip);
+          setResultado(resultadoZip.emendas);
+        }
       } else {
-        setResultado(resultado);
+        // Processar arquivo CSV (lógica existente)
+        const conteudo = await file.text();
+        
+        const resultado = processarCSVEmendas(conteudo, {
+          nomeAutor: filtroAutor || undefined,
+          ano: filtroAno,
+          uf: filtroUF || undefined,
+        });
+
+        if (resultado.erros.length > 0 && resultado.emendas.length === 0) {
+          setErro(resultado.erros.join('. '));
+        } else {
+          setResultado(resultado);
+        }
       }
     } catch (e) {
-      setErro('Erro ao processar o arquivo. Verifique se é um CSV válido do Portal da Transparência.');
+      setErro('Erro ao processar o arquivo. Verifique se é um CSV ou ZIP válido do Portal da Transparência.');
     } finally {
       setProcessando(false);
     }
@@ -75,23 +107,36 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
     setErro(null);
 
     try {
-      const conteudo = await arquivo.text();
-      const resultado = processarCSVEmendas(conteudo, {
-        nomeAutor: filtroAutor || undefined,
-        ano: filtroAno,
-        uf: filtroUF || undefined,
-      });
-      setResultado(resultado);
+      if (tipoArquivo === 'zip') {
+        const arrayBuffer = await arquivo.arrayBuffer();
+        const resultadoZip = await processarArquivoZIPEmendas(arrayBuffer, {
+          nomeAutor: filtroAutor || undefined,
+          ano: filtroAno,
+          uf: filtroUF || undefined,
+        });
+        setResultadoZIP(resultadoZip);
+        setResultado(resultadoZip.emendas);
+      } else {
+        const conteudo = await arquivo.text();
+        const resultado = processarCSVEmendas(conteudo, {
+          nomeAutor: filtroAutor || undefined,
+          ano: filtroAno,
+          uf: filtroUF || undefined,
+        });
+        setResultado(resultado);
+      }
     } catch (e) {
       setErro('Erro ao reprocessar o arquivo.');
     } finally {
       setProcessando(false);
     }
-  }, [arquivo, filtroAutor, filtroAno, filtroUF]);
+  }, [arquivo, filtroAutor, filtroAno, filtroUF, tipoArquivo]);
 
   const handleLimpar = () => {
     setArquivo(null);
     setResultado(null);
+    setResultadoZIP(null);
+    setTipoArquivo(null);
     setErro(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -102,6 +147,11 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
   const dadosBarras = resultado ? gerarDadosGraficoBarras(resultado.resumoPorFuncao, 8) : [];
   const dadosPizza = resultado ? gerarDadosGraficoPizza(resultado.resumoPorLocalidade, 6) : [];
   const topAutores = resultado ? mapToSortedArray(resultado.resumoPorAutor, 10) as ResumoAutor[] : [];
+
+  // Resumo de beneficiários (se tiver dados do ZIP)
+  const resumoBeneficiarios = resultadoZIP?.beneficiarios?.length 
+    ? gerarResumoBeneficiarios(resultadoZIP.beneficiarios) 
+    : null;
 
   // Totais
   const totalEmpenhado = resultado?.emendas.reduce((sum, e) => sum + e.valorEmpenhado, 0) || 0;
@@ -133,8 +183,27 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
         <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
           <h4 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
             <FileDown className="w-4 h-4" />
-            1. Baixe o arquivo CSV do Portal da Transparência
+            1. Baixe os dados do Portal da Transparência
           </h4>
+          
+          {/* Link Principal - Arquivo Único (ZIP) */}
+          <div className="mb-3 p-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg border border-indigo-200">
+            <a
+              href={EMENDAS_DOWNLOAD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-bold text-white transition shadow-sm"
+            >
+              <FileArchive className="w-4 h-4" />
+              📦 Arquivo ÚNICO - Emendas Parlamentares (ZIP)
+            </a>
+            <p className="text-xs text-indigo-700 mt-2">
+              ✨ <strong>Recomendado!</strong> Contém 3 planilhas completas: Emendas, Beneficiários e Pagamentos
+            </p>
+          </div>
+
+          {/* Links por ano (legado) */}
+          <p className="text-xs text-slate-500 mb-2">Ou baixe por ano (apenas emendas, sem beneficiários):</p>
           <div className="flex flex-wrap gap-2">
             {[2025, 2024, 2023, 2022].map(ano => (
               <a
@@ -149,7 +218,7 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
             ))}
           </div>
           <p className="text-[10px] text-blue-600 mt-2">
-            ⚠️ Arquivos podem ter 50-200MB. O download abrirá uma nova aba no Portal.
+            ⚠️ O arquivo ZIP único (~50-300MB) contém dados completos. CSVs por ano têm 50-200MB cada.
           </p>
         </div>
 
@@ -157,7 +226,7 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
         <div className="mb-6">
           <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
             <Upload className="w-4 h-4" />
-            2. Faça upload do arquivo baixado
+            2. Faça upload do arquivo baixado (CSV ou ZIP)
           </h4>
           
           <div className="flex gap-4">
@@ -171,7 +240,7 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.zip"
                 onChange={handleArquivoSelecionado}
                 className="hidden"
                 disabled={processando}
@@ -185,13 +254,23 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
                 <div className="flex flex-col items-center gap-2">
                   <CheckCircle className="w-8 h-8 text-emerald-500" />
                   <span className="text-sm text-emerald-700 font-medium">{arquivo.name}</span>
-                  <span className="text-xs text-emerald-600">{formatarTamanhoArquivo(arquivo.size)}</span>
+                  <span className="text-xs text-emerald-600">
+                    {formatarTamanhoArquivo(arquivo.size)} • {tipoArquivo === 'zip' ? '📦 ZIP' : '📄 CSV'}
+                  </span>
+                  {resultadoZIP && resultadoZIP.arquivosProcessados.length > 0 && (
+                    <span className="text-xs text-emerald-500">
+                      {resultadoZIP.arquivosProcessados.length} arquivos processados
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <FileText className="w-8 h-8 text-slate-400" />
-                  <span className="text-sm text-slate-600 font-medium">Clique para selecionar ou arraste o arquivo CSV</span>
-                  <span className="text-xs text-slate-400">Formato: CSV do Portal da Transparência</span>
+                  <div className="flex gap-2">
+                    <FileText className="w-8 h-8 text-slate-400" />
+                    <FileArchive className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <span className="text-sm text-slate-600 font-medium">Clique para selecionar arquivo CSV ou ZIP</span>
+                  <span className="text-xs text-slate-400">Formatos aceitos: CSV ou ZIP do Portal da Transparência</span>
                 </div>
               )}
             </label>
@@ -269,9 +348,36 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
             <div>
               <p className="text-sm font-medium text-rose-800">{erro}</p>
               <p className="text-xs text-rose-600 mt-1">
-                Certifique-se de que o arquivo é um CSV de emendas do Portal da Transparência.
+                Certifique-se de que o arquivo é um CSV ou ZIP de emendas do Portal da Transparência.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Info do ZIP processado */}
+        {resultadoZIP && resultadoZIP.arquivosProcessados.length > 0 && (
+          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <p className="text-xs font-medium text-indigo-700 flex items-center gap-2">
+              <FileArchive className="w-4 h-4" />
+              Arquivos processados do ZIP:
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {resultadoZIP.arquivosProcessados.map((arq, i) => (
+                <span key={i} className="px-2 py-1 bg-white rounded text-xs text-indigo-600 border border-indigo-100">
+                  {arq}
+                </span>
+              ))}
+            </div>
+            {resultadoZIP.beneficiarios.length > 0 && (
+              <p className="text-xs text-indigo-600 mt-2">
+                ✅ {resultadoZIP.beneficiarios.length.toLocaleString('pt-BR')} beneficiários carregados
+              </p>
+            )}
+            {resultadoZIP.pagamentos.length > 0 && (
+              <p className="text-xs text-indigo-600">
+                ✅ {resultadoZIP.pagamentos.length.toLocaleString('pt-BR')} pagamentos carregados
+              </p>
+            )}
           </div>
         )}
 
@@ -302,17 +408,18 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
             </div>
 
             {/* Tabs de visualização */}
-            <div className="mb-4 flex gap-2 border-b border-slate-200 pb-2">
+            <div className="mb-4 flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
               {[
                 { id: 'resumo', label: 'Resumo', icon: BarChart2 },
                 { id: 'funcoes', label: 'Por Função', icon: BarChart2 },
                 { id: 'localidades', label: 'Por Localidade', icon: PieChartIcon },
                 { id: 'tabela', label: 'Tabela', icon: Table },
+                ...(resumoBeneficiarios ? [{ id: 'beneficiarios', label: 'Beneficiários', icon: Users }] : []),
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setVisualizacao(tab.id as any)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition whitespace-nowrap ${
                     visualizacao === tab.id
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-slate-500 hover:bg-slate-100'
@@ -488,6 +595,117 @@ const CSVEmendasViewer: React.FC<CSVEmendasViewerProps> = ({ nomeAutorPadrao = '
                     Exibindo 100 de {resultado.emendas.length.toLocaleString('pt-BR')} registros. Use os filtros para refinar.
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Visualização de Beneficiários (somente para ZIP) */}
+            {visualizacao === 'beneficiarios' && resumoBeneficiarios && (
+              <div className="space-y-6">
+                {/* Cards de resumo */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200">
+                    <p className="text-xs font-medium text-indigo-600 mb-1">Total de Beneficiários</p>
+                    <p className="text-2xl font-bold text-indigo-800">{resumoBeneficiarios.totalBeneficiarios.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl border border-teal-200">
+                    <p className="text-xs font-medium text-teal-600 mb-1">Valor Total Recebido</p>
+                    <p className="text-2xl font-bold text-teal-800">{formatarValorEmenda(resumoBeneficiarios.valorTotalRecebido)}</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl border border-cyan-200">
+                    <p className="text-xs font-medium text-cyan-600 mb-1">Tipos de Beneficiário</p>
+                    <p className="text-2xl font-bold text-cyan-800">{resumoBeneficiarios.porTipo.size}</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl border border-violet-200">
+                    <p className="text-xs font-medium text-violet-600 mb-1">Estados (UF)</p>
+                    <p className="text-2xl font-bold text-violet-800">{resumoBeneficiarios.porUF.size}</p>
+                  </div>
+                </div>
+
+                {/* Por Tipo de Beneficiário */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 mb-3">Por Tipo de Beneficiário</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Array.from(resumoBeneficiarios.porTipo.entries())
+                      .sort((a, b) => b[1].valor - a[1].valor)
+                      .slice(0, 6)
+                      .map(([tipo, dados]) => (
+                        <div key={tipo} className="p-3 bg-white border border-slate-200 rounded-lg">
+                          <p className="text-xs font-medium text-slate-500">{tipo}</p>
+                          <p className="text-lg font-bold text-slate-700">{formatarValorEmenda(dados.valor)}</p>
+                          <p className="text-xs text-slate-400">{dados.quantidade.toLocaleString('pt-BR')} beneficiários</p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Por UF */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Por Estado (UF)
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {Array.from(resumoBeneficiarios.porUF.entries())
+                      .sort((a, b) => b[1].valor - a[1].valor)
+                      .slice(0, 12)
+                      .map(([uf, dados]) => (
+                        <div 
+                          key={uf} 
+                          className={`p-3 rounded-lg border ${
+                            uf === 'PE' || uf === 'PERNAMBUCO' 
+                              ? 'bg-emerald-50 border-emerald-300' 
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <p className={`text-sm font-bold ${
+                            uf === 'PE' || uf === 'PERNAMBUCO' ? 'text-emerald-700' : 'text-slate-700'
+                          }`}>
+                            {uf} {(uf === 'PE' || uf === 'PERNAMBUCO') && '🏠'}
+                          </p>
+                          <p className="text-xs text-slate-600">{formatarValorEmenda(dados.valor)}</p>
+                          <p className="text-[10px] text-slate-400">{dados.quantidade.toLocaleString('pt-BR')} beneficiários</p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Top Beneficiários */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 mb-3">Top 20 Beneficiários por Valor</h4>
+                  <div className="overflow-x-auto max-h-96 border border-slate-200 rounded-xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-semibold uppercase sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Beneficiário</th>
+                          <th className="px-3 py-2 text-left">Tipo</th>
+                          <th className="px-3 py-2 text-left">Município</th>
+                          <th className="px-3 py-2 text-left">UF</th>
+                          <th className="px-3 py-2 text-right">Valor Recebido</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {resumoBeneficiarios.topBeneficiarios.map((beneficiario, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 font-medium text-slate-700 max-w-[200px] truncate">
+                              {beneficiario.nomeBeneficiario || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600">{beneficiario.tipoBeneficiario || '-'}</td>
+                            <td className="px-3 py-2 text-slate-600 max-w-[120px] truncate">
+                              {beneficiario.municipio || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600">
+                              {beneficiario.uf || '-'}
+                              {(beneficiario.uf === 'PE' || beneficiario.uf === 'PERNAMBUCO') && ' 🏠'}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-700">
+                              {FORMATTER_BRL.format(beneficiario.valorRecebido)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </>
